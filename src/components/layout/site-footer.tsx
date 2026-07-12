@@ -20,8 +20,8 @@ export function SiteFooter() {
               <span className="font-display text-lg font-bold">PopMarket OS</span>
             </div>
             <p className="mt-3 max-w-sm text-sm text-muted-foreground leading-relaxed">
-              Food truck market operations — vendor applications, stall maps, visitor RSVPs, and
-              Razorpay payments in one place.
+              We run the platform. Organizers run the markets. Vendors and guests are their
+              customers — with clear commission and Billing settlements.
             </p>
           </div>
 
@@ -53,7 +53,7 @@ export function SiteFooter() {
                   href="/login"
                   className="text-sm text-foreground/80 transition-base hover:text-primary"
                 >
-                  Log in
+                  Organizer login
                 </Link>
               </li>
               <li>
@@ -62,6 +62,22 @@ export function SiteFooter() {
                   className="text-sm text-foreground/80 transition-base hover:text-primary"
                 >
                   Sign up free
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/terms"
+                  className="text-sm text-foreground/80 transition-base hover:text-primary"
+                >
+                  Organizer terms
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/admin/login"
+                  className="text-sm text-foreground/80 transition-base hover:text-primary"
+                >
+                  Platform admin
                 </Link>
               </li>
             </ul>

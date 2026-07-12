@@ -39,7 +39,13 @@ export default async function EventPaymentsPage({ params }: PaymentsPageProps) {
         description={`Revenue and transactions for ${event.title}`}
       />
 
-      <PaymentHistory payments={payments} vendorRevenue={vendorRevenue} rsvpRevenue={rsvpRevenue} />
+      <PaymentHistory
+        payments={payments}
+        vendorRevenue={vendorRevenue}
+        rsvpRevenue={rsvpRevenue}
+        eventTitle={event.title}
+        eventId={event.id}
+      />
     </div>
   );
 }

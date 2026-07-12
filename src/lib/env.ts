@@ -10,24 +10,23 @@ export function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 }
 
-export function isEmailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && normalizeEmailFrom(process.env.EMAIL_FROM));
-}
-
-export function normalizeEmailFrom(from?: string): string | null {
-  if (!from?.trim()) return null;
-  const trimmed = from.trim();
-  if (trimmed.includes('<') && trimmed.includes('>')) {
-    return trimmed.replace(/^([^<]+)</, (_, name: string) => `${name.trim()} <`);
-  }
-  if (!trimmed.includes('@')) return null;
-  return `PopMarket <${trimmed}>`;
-}
-
 export function isRazorpayConfigured(): boolean {
   return Boolean(
     process.env.RAZORPAY_KEY_ID &&
       process.env.RAZORPAY_KEY_SECRET &&
       process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
   );
+}
+
+/** Superadmin emails (comma-separated) that can access /admin */
+export function getSuperadminEmails(): string[] {
+  return (process.env.SUPERADMIN_EMAILS ?? 'platform@popmarket.dev')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isSuperadminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return getSuperadminEmails().includes(email.toLowerCase());
 }

@@ -6,11 +6,12 @@ import {
   getStallsWithAssignments,
 } from '@/lib/queries/events';
 import { createClient } from '@/lib/supabase/server';
-import { formatDate, formatCurrency } from '@/lib/utils';
+import { formatDate, formatCurrency, cn } from '@/lib/utils';
 import { RsvpForm } from '@/components/forms/rsvp-form';
 import { StallMap } from '@/components/features/stalls/stall-map';
 import { VendorMenuSection } from '@/components/features/events/vendor-menu-section';
 import { PublicEventComingSoon } from '@/components/features/events/public-event-coming-soon';
+import { DraftPreviewBanner } from '@/components/features/events/draft-preview-banner';
 import {
   PublicPortalShell,
   PortalPanel,
@@ -19,7 +20,6 @@ import {
 } from '@/components/layout/public-portal-shell';
 import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button-variants';
-import { cn } from '@/lib/utils';
 
 interface PublicEventPageProps {
   params: Promise<{ slug: string }>;
@@ -31,6 +31,7 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
 
   if (!event) notFound();
 
+  const isPreview = Boolean(event.isPreview);
   const supabase = await createClient();
 
   const [stalls, vendors, paidVendorCount, rsvpResult] = await Promise.all([
@@ -46,16 +47,19 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
 
   if (vendors.length === 0) {
     return (
-      <PublicEventComingSoon
-        slug={slug}
-        title={event.title}
-        description={event.description}
-        eventDate={event.event_date}
-        startTime={event.start_time}
-        endTime={event.end_time}
-        venueName={event.venue_name}
-        city={event.city}
-      />
+      <>
+        {isPreview && <DraftPreviewBanner dashboardHref={`/dashboard/events/${event.id}`} />}
+        <PublicEventComingSoon
+          slug={slug}
+          title={event.title}
+          description={event.description}
+          eventDate={event.event_date}
+          startTime={event.start_time}
+          endTime={event.end_time}
+          venueName={event.venue_name}
+          city={event.city}
+        />
+      </>
     );
   }
 
@@ -64,6 +68,8 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
 
   return (
     <main id="main-content" className="flex-1">
+      {isPreview && <DraftPreviewBanner dashboardHref={`/dashboard/events/${event.id}`} />}
+
       {event.cover_image_url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -74,18 +80,24 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
       )}
 
       <PublicPortalShell
-        eyebrow="Food truck market"
+        eyebrow={isPreview ? 'Draft preview' : 'Food truck market'}
         title={event.title}
         subtitle={event.description ?? undefined}
         aside={
           <div className="space-y-2">
             <PortalPanel title="Reserve your spot">
-              <RsvpForm
-                eventSlug={slug}
-                eventTitle={event.title}
-                spotsRemaining={spotsRemaining}
-                entryFeePerGuest={Number(event.rsvp_entry_fee ?? 0)}
-              />
+              {isPreview ? (
+                <p className="text-sm text-muted-foreground">
+                  RSVP is disabled in draft preview. Publish the event to accept guests.
+                </p>
+              ) : (
+                <RsvpForm
+                  eventSlug={slug}
+                  eventTitle={event.title}
+                  spotsRemaining={spotsRemaining}
+                  entryFeePerGuest={Number(event.rsvp_entry_fee ?? 0)}
+                />
+              )}
             </PortalPanel>
 
             <PortalPanel>
@@ -112,7 +124,11 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
             value={`${event.start_time?.slice(0, 5)} – ${event.end_time?.slice(0, 5)}`}
           />
           <PortalStat label="Venue" value={`${event.venue_name}, ${event.city}`} />
-          <PortalStat label="Vendors" value={`${vendors.length} live · ${paidVendorCount} paid`} highlight />
+          <PortalStat
+            label="Vendors"
+            value={`${vendors.length} live · ${paidVendorCount} paid`}
+            highlight
+          />
           <PortalStat label="Spots left" value={spotsRemaining} highlight />
         </PortalStatStrip>
 

@@ -1,5 +1,6 @@
 import { extractMenuItemsFromImage, isGeminiConfigured } from '@/lib/ai/gemini';
 import { extractMenuItemsWithGroq, isGroqConfigured } from '@/lib/ai/groq';
+import type { MenuItem } from '@/lib/menu';
 
 function isQuotaError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -20,7 +21,7 @@ export async function extractMenuFromImage(
   imageBase64: string,
   mimeType: string,
   fileName?: string,
-): Promise<{ name: string; price: number }[]> {
+): Promise<MenuItem[]> {
   if (!isMenuExtractionConfigured()) {
     throw new Error('AI_NOT_CONFIGURED');
   }

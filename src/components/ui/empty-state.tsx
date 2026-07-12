@@ -8,10 +8,21 @@ interface EmptyStateProps {
   title: string;
   description: string;
   action?: { label: string; href: string };
+  /** Show a non-clickable action with an explanation underneath */
+  actionDisabled?: boolean;
+  actionMessage?: string;
   className?: string;
 }
 
-export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  actionDisabled = false,
+  actionMessage,
+  className,
+}: EmptyStateProps) {
   return (
     <div
       className={cn(
@@ -26,9 +37,31 @@ export function EmptyState({ icon: Icon, title, description, action, className }
       <h3 className="font-display text-lg font-bold">{title}</h3>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground leading-relaxed">{description}</p>
       {action && (
-        <Link href={action.href} className={cn(buttonVariants({ size: 'sm' }), 'mt-6 hover-lift')}>
-          {action.label}
-        </Link>
+        <div className="mt-6 flex w-full max-w-sm flex-col items-center gap-2">
+          {actionDisabled ? (
+            <span
+              className={cn(
+                buttonVariants({ size: 'sm' }),
+                'pointer-events-none opacity-50 shadow-none',
+              )}
+              aria-disabled="true"
+            >
+              {action.label}
+            </span>
+          ) : (
+            <Link
+              href={action.href}
+              className={cn(buttonVariants({ size: 'sm' }), 'hover-lift')}
+            >
+              {action.label}
+            </Link>
+          )}
+          {actionDisabled && actionMessage && (
+            <p className="text-xs leading-relaxed text-warning" role="alert">
+              {actionMessage}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

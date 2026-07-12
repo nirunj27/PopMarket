@@ -32,7 +32,13 @@ import { MapPinPreview } from '@/components/features/events/map-pin-preview';
 import { FeeCalculator } from '@/components/features/events/fee-calculator';
 import type { BookedEventDate } from '@/lib/queries/events';
 
-export function EventForm({ bookedDates = [] }: { bookedDates?: BookedEventDate[] }) {
+export function EventForm({
+  bookedDates = [],
+  availableCities = [...INDIAN_CITIES],
+}: {
+  bookedDates?: BookedEventDate[];
+  availableCities?: string[];
+}) {
   const [isLoading, setIsLoading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [activeTemplateId, setActiveTemplateId] = useState<string>();
@@ -183,7 +189,7 @@ export function EventForm({ bookedDates = [] }: { bookedDates?: BookedEventDate[
                   label="City"
                   required
                   placeholder="Select city"
-                  options={INDIAN_CITIES.map((c) => ({ value: c, label: c }))}
+                  options={availableCities.map((c) => ({ value: c, label: c }))}
                   error={errors.city?.message}
                   {...register('city')}
                 />
@@ -198,7 +204,7 @@ export function EventForm({ bookedDates = [] }: { bookedDates?: BookedEventDate[
                         value={field.value}
                         onChange={field.onChange}
                         onPlaceSelect={({ city, venueName }) => {
-                          if (city && (INDIAN_CITIES as readonly string[]).includes(city)) {
+                          if (city && availableCities.includes(city)) {
                             setValue('city', city, { shouldValidate: true });
                           }
                           if (venueName) {

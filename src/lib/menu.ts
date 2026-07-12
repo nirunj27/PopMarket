@@ -1,6 +1,9 @@
 export interface MenuItem {
   name: string;
   price: number;
+  imageUrl?: string;
+  /** Normalized crop box from AI (0–1). Not persisted after imageUrl is set. */
+  box?: { x: number; y: number; w: number; h: number };
 }
 
 export function parseMenuItems(raw: unknown): MenuItem[] {
@@ -10,10 +13,46 @@ export function parseMenuItems(raw: unknown): MenuItem[] {
       if (!item || typeof item !== 'object') return null;
       const name = 'name' in item && typeof item.name === 'string' ? item.name.trim() : '';
       const price = parseMenuPrice('price' in item ? item.price : undefined);
+      const imageUrl =
+        'imageUrl' in item && typeof item.imageUrl === 'string' && item.imageUrl.trim()
+          ? item.imageUrl.trim()
+          : undefined;
+      const boxRaw =
+        'box' in item
+          ? item.box
+          : 'bbox' in item
+            ? item.bbox
+            : 'region' in item
+              ? item.region
+              : undefined;
+      const box = parseBox(boxRaw);
       if (!name || Number.isNaN(price) || price < 0) return null;
-      return { name, price };
+      return {
+        name,
+        price,
+        ...(imageUrl ? { imageUrl } : {}),
+        ...(box ? { box } : {}),
+      };
     })
     .filter((item): item is MenuItem => item !== null);
+}
+
+function parseBox(raw: unknown): MenuItem['box'] | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const x = Number(o.x ?? o.left);
+  const y = Number(o.y ?? o.top);
+  const w = Number(o.w ?? o.width);
+  const h = Number(o.h ?? o.height);
+  if ([x, y, w, h].some((n) => Number.isNaN(n) || n < 0)) return undefined;
+  if (w <= 0 || h <= 0) return undefined;
+  const scale = x > 1.5 || y > 1.5 || w > 1.5 || h > 1.5 ? 100 : 1;
+  return {
+    x: Math.min(1, Math.max(0, x / scale)),
+    y: Math.min(1, Math.max(0, y / scale)),
+    w: Math.min(1, Math.max(0, w / scale)),
+    h: Math.min(1, Math.max(0, h / scale)),
+  };
 }
 
 function parseMenuPrice(raw: unknown): number {
@@ -47,7 +86,13 @@ export function formatMenuDescription(items: MenuItem[], summary?: string): stri
   else text = trimmedSummary ?? '';
 
   if (items.length > 0) {
-    text += `${MENU_JSON_MARKER}${JSON.stringify(items)}-->`;
+    // Persist name/price/imageUrl only — drop ephemeral AI boxes
+    const persistable = items.map(({ name, price, imageUrl }) => ({
+      name,
+      price,
+      ...(imageUrl ? { imageUrl } : {}),
+    }));
+    text += `${MENU_JSON_MARKER}${JSON.stringify(persistable)}-->`;
   }
   return text;
 }
@@ -96,7 +141,7 @@ export function getVendorMenuLines(
   menuItems: unknown,
   menuDescription?: string | null,
   maxItems?: number,
-): { name: string; price?: number }[] {
+): { name: string; price?: number; imageUrl?: string }[] {
   const applyLimit = <T,>(items: T[]) =>
     maxItems === undefined ? items : items.slice(0, maxItems);
 
@@ -105,6 +150,7 @@ export function getVendorMenuLines(
     return applyLimit(structured).map((item) => ({
       name: item.name,
       price: item.price,
+      ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
     }));
   }
 
@@ -113,6 +159,7 @@ export function getVendorMenuLines(
     return applyLimit(fromDescription).map((item) => ({
       name: item.name,
       price: item.price,
+      ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
     }));
   }
 

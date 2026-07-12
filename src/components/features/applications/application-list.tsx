@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { reviewApplicationAction } from '@/lib/actions/events';
 import { APPLICATION_STATUS_CONFIG } from '@/lib/constants';
 import type { VendorApplication } from '@/types';
@@ -20,6 +21,7 @@ export function ApplicationList({ applications }: ApplicationListProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const handleReview = (applicationId: string, status: 'approved' | 'waitlisted' | 'rejected') => {
     startTransition(async () => {
@@ -42,16 +44,9 @@ export function ApplicationList({ applications }: ApplicationListProps) {
       };
       toast.success(messages[status]);
 
-      if (result.data?.emailSent === false) {
-        toast.warning(
-          result.data.emailError
-            ? `Status updated but email failed: ${result.data.emailError}`
-            : 'Status updated but email was not sent. Check Resend configuration.',
-        );
-      }
-
       setExpandedId(null);
       setRejectionReason('');
+      router.refresh();
     });
   };
 

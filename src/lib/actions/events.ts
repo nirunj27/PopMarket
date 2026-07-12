@@ -7,11 +7,10 @@ import { generateToken, slugify } from '@/lib/utils';
 import { stallCodeForCell } from '@/lib/stall-layout';
 import type { StallLayoutCell } from '@/lib/stall-layout';
 import type { ActionResult } from '@/types';
-import { sendRsvpConfirmationEmail, sendVendorStatusEmail } from '@/lib/email';
-import { getAppUrl } from '@/lib/env';
 import { createRazorpayOrder, verifyRazorpaySignature } from '@/lib/payments/razorpay';
 import { refundRazorpayPayment } from '@/lib/payments/razorpay-refund';
-import { ensureVendorPaymentRecord } from '@/lib/payments/ensure-payment';
+import { ensureVendorPaymentRecord, getPlatformFeePercent } from '@/lib/payments/ensure-payment';
+import { calcPlatformSplit } from '@/lib/platform/fees';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatMenuDescription, parseMenuItemsJson } from '@/lib/menu';
 import { DEFAULT_VENDOR_TERMS } from '@/lib/vendor-terms';
@@ -22,15 +21,16 @@ import {
   publishedEventLimitMessage,
 } from '@/lib/plans';
 import { getOrganizerPlan } from '@/lib/plans-server';
+import { firstZodError, formatZodFieldErrors } from '@/lib/validations/helpers';
+import { PLATFORM_PAUSED_MESSAGE, isPlatformEnabled } from '@/lib/platform/admin';
+import type { z } from 'zod';
 
-function mapZodErrors(error: { flatten: () => { fieldErrors: Record<string, string[]> } }) {
-  return error.flatten().fieldErrors;
+function mapZodErrors(error: z.ZodError) {
+  return formatZodFieldErrors(error);
 }
 
-function zodFirstError(error: { flatten: () => { fieldErrors: Record<string, string[]> } }): string {
-  const fields = error.flatten().fieldErrors;
-  const first = Object.values(fields).flat().find(Boolean);
-  return first ?? 'Invalid input';
+function zodFirstError(error: z.ZodError): string {
+  return firstZodError(error);
 }
 
 function formString(formData: FormData, key: string, fallback = ''): string {
@@ -48,6 +48,10 @@ async function getOrganizerId() {
 }
 
 export async function createEventAction(formData: FormData): Promise<ActionResult<{ id: string }>> {
+  if (!(await isPlatformEnabled())) {
+    return { success: false, error: PLATFORM_PAUSED_MESSAGE };
+  }
+
   const raw = {
     title: formData.get('title')?.toString() ?? '',
     description: formData.get('description')?.toString() ?? '',
@@ -226,6 +230,14 @@ async function generateStallsFromLayout(
 }
 
 export async function publishEventAction(eventId: string): Promise<ActionResult> {
+  if (!(await isPlatformEnabled())) {
+    return {
+      success: false,
+      error:
+        'PopMarket is temporarily not accepting new published markets. Try again once the platform is re-enabled.',
+    };
+  }
+
   const { supabase, userId } = await getOrganizerId();
   const plan = await getOrganizerPlan(supabase, userId);
   const limits = getPlanLimits(plan);
@@ -373,7 +385,7 @@ export async function deleteEventAction(eventId: string): Promise<
 export async function submitVendorApplicationAction(
   eventSlug: string,
   formData: FormData,
-): Promise<ActionResult<{ token: string; emailSent: boolean; emailError?: string }>> {
+): Promise<ActionResult<{ token: string }>> {
   const { vendorApplicationSchema } = await import('@/lib/validations');
 
   const raw = {
@@ -540,35 +552,16 @@ export async function submitVendorApplicationAction(
 
   if (error) return { success: false, error: error.message };
 
-  const appUrl = getAppUrl();
-  const emailResult = await sendVendorStatusEmail(parsed.data.email, {
-    businessName: parsed.data.businessName,
-    ownerName: parsed.data.ownerName,
-    status: 'pending',
-    eventTitle: event.title,
-    eventDate: event.event_date,
-    venueName: event.venue_name,
-    city: event.city,
-    stallFee: Number(event.stall_fee),
-    premiumFee: preferredStall?.is_premium ? Number(preferredStall.premium_fee) : 0,
-    preferredStallCode: preferredStall?.stall_code,
-    statusUrl: `${appUrl}/vendor/${token}`,
-  });
-
   return {
     success: true,
-    data: {
-      token,
-      emailSent: emailResult.success && !emailResult.skipped,
-      emailError: emailResult.error,
-    },
+    data: { token },
   };
 }
 
 export async function reviewApplicationAction(
   applicationId: string,
   formData: FormData,
-): Promise<ActionResult<{ emailSent?: boolean; emailError?: string }>> {
+): Promise<ActionResult> {
   const raw = {
     status: formString(formData, 'status'),
     rejectionReason: formString(formData, 'rejectionReason') || undefined,
@@ -641,11 +634,16 @@ export async function reviewApplicationAction(
   if (error) return { success: false, error: error.message };
 
   if (parsed.data.status === 'approved') {
+    const feePercent = await getPlatformFeePercent();
+    const { platformFee, organizerNet } = calcPlatformSplit(totalAmount, feePercent);
+
     const { error: paymentError } = await supabase.from('payments').upsert(
       {
         event_id: application.event_id,
         application_id: applicationId,
         amount: totalAmount,
+        platform_fee_amount: platformFee,
+        organizer_net_amount: organizerNet,
         status: 'pending',
       },
       { onConflict: 'application_id' },
@@ -660,36 +658,10 @@ export async function reviewApplicationAction(
     }
   }
 
-  const appUrl = getAppUrl();
-  const emailResult = await sendVendorStatusEmail(application.email, {
-    businessName: application.business_name,
-    ownerName: application.owner_name,
-    status: parsed.data.status,
-    eventTitle: eventData.title,
-    eventDate: eventData.event_date,
-    venueName: eventData.venue_name,
-    city: eventData.city,
-    stallFee: Number(eventData.stall_fee),
-    premiumFee,
-    preferredStallCode: preferredStall?.stall_code,
-    rejectionReason: parsed.data.rejectionReason,
-    statusUrl: `${appUrl}/vendor/${application.access_token}`,
-    paymentUrl:
-      parsed.data.status === 'approved'
-        ? `${appUrl}/vendor/${application.access_token}#pay`
-        : undefined,
-  });
-
   revalidatePath(`/dashboard/events/${application.event_id}/applications`);
   revalidatePath(`/vendor/${application.access_token}`);
 
-  return {
-    success: true,
-    data: {
-      emailSent: emailResult.success && !emailResult.skipped,
-      emailError: emailResult.error,
-    },
-  };
+  return { success: true };
 }
 
 export async function assignStallAction(
@@ -762,40 +734,6 @@ export async function assignStallAction(
     });
 
     if (error) return { success: false, error: error.message };
-
-    const { data: assignmentDetails } = await supabase
-      .from('vendor_applications')
-      .select('email, owner_name, business_name, access_token, events(title, event_date, venue_name, city)')
-      .eq('id', applicationId)
-      .single();
-
-    const { data: stall } = await supabase
-      .from('stalls')
-      .select('stall_code')
-      .eq('id', stallId)
-      .single();
-
-    if (assignmentDetails && stall) {
-      const evt = assignmentDetails.events as unknown as {
-        title: string;
-        event_date: string;
-        venue_name: string;
-        city: string;
-      };
-      const appUrl = getAppUrl();
-      await sendVendorStatusEmail(assignmentDetails.email, {
-        businessName: assignmentDetails.business_name,
-        ownerName: assignmentDetails.owner_name,
-        status: 'approved',
-        eventTitle: evt.title,
-        eventDate: evt.event_date,
-        venueName: evt.venue_name,
-        city: evt.city,
-        assignedStallCode: stall.stall_code,
-        statusUrl: `${appUrl}/vendor/${assignmentDetails.access_token}`,
-        paymentUrl: `${appUrl}/vendor/${assignmentDetails.access_token}#pay`,
-      });
-    }
   }
 
   revalidatePath(`/dashboard/events/${eventId}/stalls`);
@@ -844,7 +782,14 @@ export async function ensureEventStallsAction(eventId: string): Promise<ActionRe
 export async function submitRsvpAction(
   eventSlug: string,
   formData: FormData,
-): Promise<ActionResult<{ token: string; status: string; emailSent: boolean; paymentPending?: boolean; entryFeeAmount?: number }>> {
+): Promise<
+  ActionResult<{
+    token: string;
+    status: string;
+    paymentPending?: boolean;
+    entryFeeAmount?: number;
+  }>
+> {
   const { rsvpSchema } = await import('@/lib/validations');
 
   const raw = {
@@ -906,6 +851,9 @@ export async function submitRsvpAction(
   const token = generateToken(24);
   const entryFee = Number(event.rsvp_entry_fee ?? 0);
   const needsPayment = entryFee > 0 && !isWaitlisted;
+  const grossEntry = needsPayment ? entryFee * parsed.data.partySize : 0;
+  const feePercent = needsPayment ? await getPlatformFeePercent() : 0;
+  const { platformFee, organizerNet } = calcPlatformSplit(grossEntry, feePercent);
 
   const { error } = await supabase.from('visitor_rsvps').insert({
     event_id: event.id,
@@ -915,39 +863,23 @@ export async function submitRsvpAction(
     party_size: parsed.data.partySize,
     status: isWaitlisted ? 'waitlisted' : 'confirmed',
     access_token: token,
-    entry_fee_amount: needsPayment ? entryFee * parsed.data.partySize : 0,
+    entry_fee_amount: grossEntry,
+    platform_fee_amount: platformFee,
+    organizer_net_amount: organizerNet,
     payment_status: needsPayment ? 'pending' : 'none',
   });
 
   if (error) return { success: false, error: error.message };
 
   const status = isWaitlisted ? 'waitlisted' : 'confirmed';
-  const appUrl = getAppUrl();
-
-  const emailResult = await sendRsvpConfirmationEmail(parsed.data.email, {
-    guestName: parsed.data.name,
-    partySize: parsed.data.partySize,
-    status,
-    eventTitle: event.title,
-    eventDate: event.event_date,
-    venueName: event.venue_name,
-    venueAddress: event.venue_address,
-    city: event.city,
-    startTime: event.start_time,
-    endTime: event.end_time,
-    setupTime: event.setup_time ?? undefined,
-    description: event.description ?? undefined,
-    confirmationUrl: `${appUrl}/rsvp/${token}`,
-  });
 
   return {
     success: true,
     data: {
       token,
       status,
-      emailSent: emailResult.success && !emailResult.skipped,
       paymentPending: needsPayment,
-      entryFeeAmount: needsPayment ? entryFee * parsed.data.partySize : 0,
+      entryFeeAmount: needsPayment ? grossEntry : 0,
     },
   };
 }

@@ -4,6 +4,7 @@ import { StatCard } from '@/components/dashboard/stat-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { getDashboardStats, getEventsForOrganizer } from '@/lib/queries/events';
 import { isSupabaseConfigured } from '@/lib/env';
+import { PLATFORM_PAUSED_MESSAGE, isPlatformEnabled } from '@/lib/platform/admin';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { Calendar, Truck, Users, Clock } from 'lucide-react';
 import Link from 'next/link';
@@ -11,7 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default async function DashboardPage() {
-  const [stats, events] = await Promise.all([getDashboardStats(), getEventsForOrganizer()]);
+  const configured = isSupabaseConfigured();
+  const [stats, events, platformOn] = configured
+    ? await Promise.all([getDashboardStats(), getEventsForOrganizer(), isPlatformEnabled()])
+    : [null, [], true];
 
   const statCards = [
     {
@@ -42,12 +46,14 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-10">
-      {!isSupabaseConfigured() && <SetupBanner />}
+      {!configured && <SetupBanner />}
 
       <PageHeader
         title="Dashboard"
         description="Overview of your food truck markets"
         action={{ label: 'New event', href: '/dashboard/events/new' }}
+        actionDisabled={!platformOn}
+        actionMessage={!platformOn ? PLATFORM_PAUSED_MESSAGE : undefined}
       />
 
       <section aria-label="Key metrics" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -73,6 +79,8 @@ export default async function DashboardPage() {
               title="No events yet"
               description="Create your first food truck market to start collecting vendor applications and RSVPs."
               action={{ label: 'Create event', href: '/dashboard/events/new' }}
+              actionDisabled={!platformOn}
+              actionMessage={!platformOn ? PLATFORM_PAUSED_MESSAGE : undefined}
             />
           ) : (
             <ul className="space-y-3" role="list">

@@ -1,4 +1,7 @@
-import { parseMenuItems } from '@/lib/menu';
+import { parseMenuItems, type MenuItem } from '@/lib/menu';
+
+const MENU_EXTRACT_PROMPT =
+  'Extract every food menu item and price from this image. When a dish photo appears next to an item, also return its bounding box as fractions of the image (0–1): x,y = top-left, w,h = size. Return only JSON: {"items":[{"name":"string","price":number,"box":{"x":0,"y":0,"w":0,"h":0}}]}. Omit box if there is no dish photo. Prices in INR as plain numbers. Skip headers and non-food lines.';
 
 const MODEL_FALLBACKS = [
   process.env.GROQ_MODEL,
@@ -49,7 +52,7 @@ async function callGroqModel(
   model: string,
   apiKey: string,
   dataUrl: string,
-): Promise<{ name: string; price: number }[]> {
+): Promise<MenuItem[]> {
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -67,7 +70,7 @@ async function callGroqModel(
           content: [
             {
               type: 'text',
-              text: 'Extract every food menu item and price from this image. Return only JSON: {"items":[{"name":"string","price":number}]}. Prices in INR as plain numbers. Skip headers and non-food lines.',
+              text: MENU_EXTRACT_PROMPT,
             },
             {
               type: 'image_url',
@@ -114,7 +117,7 @@ async function callGroqModel(
 export async function extractMenuItemsWithGroq(
   imageBase64: string,
   mimeType: string,
-): Promise<{ name: string; price: number }[]> {
+): Promise<MenuItem[]> {
   const apiKey = process.env.GROQ_API_KEY?.trim();
   if (!apiKey) {
     throw new Error('GROQ_NOT_CONFIGURED');

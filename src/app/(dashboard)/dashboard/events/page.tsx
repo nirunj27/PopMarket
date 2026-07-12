@@ -3,6 +3,7 @@ import { SetupBanner } from '@/components/layout/setup-banner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { getEventsForOrganizer } from '@/lib/queries/events';
 import { isSupabaseConfigured } from '@/lib/env';
+import { PLATFORM_PAUSED_MESSAGE, isPlatformEnabled } from '@/lib/platform/admin';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,9 @@ import Link from 'next/link';
 
 export default async function EventsPage() {
   const configured = isSupabaseConfigured();
-  const events = configured ? await getEventsForOrganizer() : [];
+  const [events, platformOn] = configured
+    ? await Promise.all([getEventsForOrganizer(), isPlatformEnabled()])
+    : [[], true];
 
   return (
     <div className="space-y-10">
@@ -21,6 +24,8 @@ export default async function EventsPage() {
         title="Events"
         description="Manage your food truck markets"
         action={{ label: 'New event', href: '/dashboard/events/new' }}
+        actionDisabled={!platformOn}
+        actionMessage={!platformOn ? PLATFORM_PAUSED_MESSAGE : undefined}
       />
 
       {events.length === 0 ? (
@@ -29,6 +34,8 @@ export default async function EventsPage() {
           title="No events yet"
           description="Create your first food truck market to start collecting vendor applications."
           action={{ label: 'Create event', href: '/dashboard/events/new' }}
+          actionDisabled={!platformOn}
+          actionMessage={!platformOn ? PLATFORM_PAUSED_MESSAGE : undefined}
         />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" role="list">

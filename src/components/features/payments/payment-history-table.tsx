@@ -44,11 +44,31 @@ export function PaymentHistoryTable({ payments }: PaymentHistoryTableProps) {
       },
       {
         id: 'amount',
-        header: 'Amount',
+        header: 'Gross',
         sortable: true,
         getSortValue: (p) => p.amount,
         getSearchValue: (p) => String(p.amount),
         cell: (p) => <span className="font-semibold">{formatCurrency(p.amount)}</span>,
+      },
+      {
+        id: 'platform_fee',
+        header: 'Platform',
+        sortable: true,
+        getSortValue: (p) => p.platform_fee_amount,
+        getSearchValue: (p) => String(p.platform_fee_amount),
+        cell: (p) => (
+          <span className="text-muted-foreground">{formatCurrency(p.platform_fee_amount)}</span>
+        ),
+      },
+      {
+        id: 'organizer_net',
+        header: 'Your net',
+        sortable: true,
+        getSortValue: (p) => p.organizer_net_amount,
+        getSearchValue: (p) => String(p.organizer_net_amount),
+        cell: (p) => (
+          <span className="font-medium text-secondary">{formatCurrency(p.organizer_net_amount)}</span>
+        ),
       },
       {
         id: 'status',
@@ -77,11 +97,26 @@ export function PaymentHistoryTable({ payments }: PaymentHistoryTableProps) {
       },
       {
         id: 'reference',
-        header: 'Ref',
+        header: 'Razorpay',
         sortable: true,
-        getSortValue: (p) => p.reference,
-        getSearchValue: (p) => p.reference,
-        cell: (p) => <span className="font-mono text-xs">{p.reference}</span>,
+        getSortValue: (p) => p.razorpay_payment_id ?? p.reference,
+        getSearchValue: (p) =>
+          [p.razorpay_payment_id, p.razorpay_order_id, p.reference].filter(Boolean).join(' '),
+        cell: (p) => (
+          <div className="max-w-[140px]">
+            <p className="truncate font-mono text-xs" title={p.razorpay_payment_id ?? undefined}>
+              {p.razorpay_payment_id ?? p.reference}
+            </p>
+            {p.razorpay_order_id && (
+              <p
+                className="truncate font-mono text-[10px] text-muted-foreground"
+                title={p.razorpay_order_id}
+              >
+                {p.razorpay_order_id}
+              </p>
+            )}
+          </div>
+        ),
       },
     ],
     [],

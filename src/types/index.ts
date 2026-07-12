@@ -105,6 +105,8 @@ export interface Payment {
   event_id: string;
   application_id: string;
   amount: number;
+  platform_fee_amount?: number;
+  organizer_net_amount?: number;
   status: PaymentStatus;
   notes: string | null;
   paid_at: string | null;
@@ -139,9 +141,13 @@ export interface EventPaymentRow {
   name: string;
   email: string;
   amount: number;
+  platform_fee_amount: number;
+  organizer_net_amount: number;
   status: string;
   paid_at: string | null;
   reference: string;
+  razorpay_payment_id: string | null;
+  razorpay_order_id: string | null;
   created_at: string;
 }
 

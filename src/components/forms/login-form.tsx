@@ -7,16 +7,23 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { loginSchema, type LoginInput } from '@/lib/validations';
 import { loginAction } from '@/lib/actions/auth';
+import { queueToast } from '@/lib/toast-queue';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { PasswordStrength } from '@/components/ui/password-strength';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-export function LoginForm() {
+interface LoginFormProps {
+  /** organizer = market clients; superadmin = platform team */
+  variant?: 'organizer' | 'superadmin';
+}
+
+export function LoginForm({ variant = 'organizer' }: LoginFormProps) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const isAdmin = variant === 'superadmin';
 
   const {
     register,
@@ -41,6 +48,7 @@ export function LoginForm() {
     const formData = new FormData();
     formData.append('email', data.email);
     formData.append('password', data.password);
+    formData.append('expectedRole', variant);
 
     const result = await loginAction(formData);
 
@@ -50,16 +58,29 @@ export function LoginForm() {
       return;
     }
 
-    toast.success('Welcome');
-    router.push('/dashboard');
+    const redirectTo = result.data?.redirectTo ?? (isAdmin ? '/admin' : '/dashboard');
+    queueToast(
+      isAdmin || result.data?.role === 'superadmin'
+        ? 'Welcome back to the platform console'
+        : 'Welcome back to your organizer dashboard',
+    );
+
+    // Soft navigate then revalidate RSC data — toast shows on destination
+    router.replace(redirectTo);
     router.refresh();
   };
 
   return (
     <Card className="card-elevated w-full max-w-md border-border/60">
       <CardHeader className="text-center">
-        <CardTitle className="font-display text-2xl">Welcome</CardTitle>
-        <CardDescription>Sign in to manage your food truck markets</CardDescription>
+        <CardTitle className="font-display text-2xl">
+          {isAdmin ? 'Platform admin' : 'Organizer sign in'}
+        </CardTitle>
+        <CardDescription>
+          {isAdmin
+            ? 'Control commission, organizers, and all markets'
+            : 'Manage your food truck markets, vendors, and RSVPs'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-4" noValidate>
@@ -90,11 +111,11 @@ export function LoginForm() {
               error={errors.password?.message}
               {...register('password')}
             />
-            <PasswordStrength password={password} />
+            {!isAdmin && <PasswordStrength password={password} />}
           </div>
 
           <Button type="submit" className="w-full" size="lg" isLoading={isLoading}>
-            Sign in
+            {isAdmin ? 'Enter admin console' : 'Sign in'}
           </Button>
         </form>
       </CardContent>

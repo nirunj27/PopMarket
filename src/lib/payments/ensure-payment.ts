@@ -1,11 +1,22 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { calcPlatformSplit } from '@/lib/platform/fees';
+
+export async function getPlatformFeePercent(): Promise<number> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from('platform_settings')
+    .select('platform_fee_percent')
+    .eq('id', 1)
+    .maybeSingle();
+  return Number(data?.platform_fee_percent ?? 10);
+}
 
 export async function ensureVendorPaymentRecord(applicationId: string) {
   const supabase = createAdminClient();
 
   const { data: existing } = await supabase
     .from('payments')
-    .select('id, amount, status, razorpay_order_id')
+    .select('id, amount, status, razorpay_order_id, platform_fee_amount, organizer_net_amount')
     .eq('application_id', applicationId)
     .maybeSingle();
 
@@ -13,9 +24,7 @@ export async function ensureVendorPaymentRecord(applicationId: string) {
 
   const { data: application } = await supabase
     .from('vendor_applications')
-    .select(
-      'id, event_id, status, preferred_stall_id, events!inner(stall_fee)',
-    )
+    .select('id, event_id, status, preferred_stall_id, events!inner(stall_fee)')
     .eq('id', applicationId)
     .single();
 
@@ -37,6 +46,8 @@ export async function ensureVendorPaymentRecord(applicationId: string) {
   }
 
   const amount = Number(event.stall_fee) + premiumFee;
+  const feePercent = await getPlatformFeePercent();
+  const { platformFee, organizerNet } = calcPlatformSplit(amount, feePercent);
 
   const { data: created, error } = await supabase
     .from('payments')
@@ -44,9 +55,11 @@ export async function ensureVendorPaymentRecord(applicationId: string) {
       event_id: application.event_id,
       application_id: applicationId,
       amount,
+      platform_fee_amount: platformFee,
+      organizer_net_amount: organizerNet,
       status: 'pending',
     })
-    .select('id, amount, status, razorpay_order_id')
+    .select('id, amount, status, razorpay_order_id, platform_fee_amount, organizer_net_amount')
     .single();
 
   if (error) {

@@ -7,22 +7,21 @@ export function mapAuthError(message: string): string {
     lower.includes('email address cannot be used')
   ) {
     return (
-      'This email cannot be used for signup yet. Supabase requires custom SMTP for non-team emails. ' +
-      'Fix: Supabase Dashboard → Authentication → SMTP Settings (add Resend/SendGrid), ' +
-      'or turn off “Confirm email” under Providers → Email for local testing.'
+      'This email cannot be used for signup yet. In Supabase: Authentication → Providers → Email → turn off “Confirm email” for testing, ' +
+      'or configure custom SMTP under Authentication → SMTP Settings.'
     );
   }
 
   if (lower.includes('rate limit') || lower.includes('over_email_send_rate_limit')) {
-    return 'Too many email attempts. Wait a few minutes and try again.';
+    return 'Too many auth attempts. Wait a few minutes and try again.';
   }
 
   if (lower.includes('email not confirmed')) {
-    return 'Please confirm your email before signing in. Check your inbox for the confirmation link.';
+    return 'Please confirm your email before signing in, or disable email confirmation in Supabase for local testing.';
   }
 
   if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
-    return 'Invalid email or password. If you just signed up, confirm your email first.';
+    return 'Invalid email or password.';
   }
 
   if (lower.includes('user already registered')) {

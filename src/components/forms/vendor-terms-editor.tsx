@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { updateEventVendorTermsAction } from '@/lib/actions/events';
 import { DEFAULT_VENDOR_TERMS } from '@/lib/vendor-terms';
 import { VendorTermsDisplay } from '@/components/features/vendors/vendor-terms-display';
@@ -18,6 +19,7 @@ export function VendorTermsEditor({ eventId, initialTerms }: VendorTermsEditorPr
   const [terms, setTerms] = useState(initialTerms);
   const [preview, setPreview] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const save = () => {
     startTransition(async () => {
@@ -27,6 +29,7 @@ export function VendorTermsEditor({ eventId, initialTerms }: VendorTermsEditorPr
         return;
       }
       toast.success('Vendor terms saved');
+      router.refresh();
     });
   };
 

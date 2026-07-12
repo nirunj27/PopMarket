@@ -218,7 +218,7 @@ export function RsvpConfirmationCard({
             <p className="text-center text-xs text-muted-foreground">
               {isConfirmed
                 ? 'Screenshot this page — show the QR or pass number at the gate'
-                : "We'll email you if a spot opens up"}
+                : 'Check this page if a spot opens up'}
             </p>
           </div>
         </article>

@@ -5,7 +5,7 @@ import { AuthHeader } from '@/components/layout/auth-header';
 import { PageContainer } from '@/components/layout/page-container';
 
 export const metadata: Metadata = {
-  title: 'Log in',
+  title: 'Organizer login',
 };
 
 export default function LoginPage() {
@@ -15,7 +15,7 @@ export default function LoginPage() {
       <main id="main-content" className="flex flex-1 items-center">
         <PageContainer className="flex w-full justify-center py-12">
           <div className="w-full max-w-md space-y-6">
-            <LoginForm />
+            <LoginForm variant="organizer" />
             <p className="text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{' '}
               <Link
@@ -23,6 +23,15 @@ export default function LoginPage() {
                 className="font-semibold text-primary underline-offset-4 transition-base hover:underline"
               >
                 Sign up
+              </Link>
+            </p>
+            <p className="text-center text-sm text-muted-foreground">
+              Platform team?{' '}
+              <Link
+                href="/admin/login"
+                className="font-semibold text-secondary underline-offset-4 transition-base hover:underline"
+              >
+                Superadmin login
               </Link>
             </p>
           </div>

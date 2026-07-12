@@ -30,7 +30,6 @@ export function RsvpForm({
   const [success, setSuccess] = useState<{
     token: string;
     status: string;
-    emailSent: boolean;
     paymentPending: boolean;
     entryFeeAmount: number;
     guestName: string;
@@ -82,7 +81,6 @@ export function RsvpForm({
     setSuccess({
       token: result.data?.token ?? '',
       status: result.data?.status ?? 'confirmed',
-      emailSent: result.data?.emailSent ?? false,
       paymentPending,
       entryFeeAmount: result.data?.entryFeeAmount ?? 0,
       guestName: data.name,
@@ -143,10 +141,6 @@ export function RsvpForm({
               Open full pass page
             </a>
           </div>
-        )}
-
-        {success.emailSent && (
-          <p className="text-[10px] text-muted-foreground">Confirmation email sent.</p>
         )}
       </div>
     );

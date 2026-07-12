@@ -68,15 +68,51 @@ export async function getEventById(eventId: string): Promise<Event | null> {
   return data;
 }
 
-export async function getEventBySlug(slug: string): Promise<Event | null> {
+export async function getEventBySlug(slug: string): Promise<(Event & { isPreview?: boolean }) | null> {
   const supabase = await createClient();
-  const { data } = await supabase
+
+  const { data: published } = await supabase
     .from('events')
     .select('*')
     .eq('slug', slug)
     .eq('status', 'published')
-    .single();
-  return data;
+    .maybeSingle();
+
+  if (published) return published;
+
+  // Draft / unpublished: owning organizer can preview public & apply links
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // Prefer owner RLS; fall back to service role so previews work even if
+  // session cookies are slow to refresh when opening links in a new tab.
+  const { data: ownedViaRls } = await supabase
+    .from('events')
+    .select('*')
+    .eq('slug', slug)
+    .eq('organizer_id', user.id)
+    .maybeSingle();
+
+  if (ownedViaRls) {
+    return { ...ownedViaRls, isPreview: ownedViaRls.status !== 'published' };
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: owned } = await admin
+      .from('events')
+      .select('*')
+      .eq('slug', slug)
+      .eq('organizer_id', user.id)
+      .maybeSingle();
+
+    if (!owned) return null;
+    return { ...owned, isPreview: owned.status !== 'published' };
+  } catch {
+    return null;
+  }
 }
 
 export async function getApplicationsForEvent(eventId: string): Promise<VendorApplication[]> {
@@ -157,13 +193,15 @@ export async function getPaymentsForEvent(eventId: string): Promise<EventPayment
     supabase
       .from('payments')
       .select(
-        'id, amount, status, paid_at, created_at, razorpay_payment_id, vendor_applications(business_name, email)',
+        'id, amount, platform_fee_amount, organizer_net_amount, status, paid_at, created_at, razorpay_payment_id, razorpay_order_id, vendor_applications(business_name, email)',
       )
       .eq('event_id', eventId)
       .order('created_at', { ascending: false }),
     supabase
       .from('visitor_rsvps')
-      .select('id, name, email, entry_fee_amount, payment_status, paid_at, created_at, razorpay_payment_id')
+      .select(
+        'id, name, email, entry_fee_amount, platform_fee_amount, organizer_net_amount, payment_status, paid_at, created_at, razorpay_payment_id, razorpay_order_id',
+      )
       .eq('event_id', eventId)
       .neq('payment_status', 'none')
       .order('created_at', { ascending: false }),
@@ -175,30 +213,46 @@ export async function getPaymentsForEvent(eventId: string): Promise<EventPayment
       | { business_name: string; email: string }[]
       | null;
     const app = Array.isArray(rawApp) ? rawApp[0] : rawApp;
+    const amount = Number(p.amount);
+    const platformFee = Number(p.platform_fee_amount ?? 0);
+    const organizerNet = Number(p.organizer_net_amount ?? amount - platformFee);
     return {
       id: p.id,
       type: 'vendor' as const,
       name: app?.business_name ?? 'Vendor',
       email: app?.email ?? '',
-      amount: Number(p.amount),
+      amount,
+      platform_fee_amount: platformFee,
+      organizer_net_amount: organizerNet,
       status: p.status,
       paid_at: p.paid_at,
       reference: p.razorpay_payment_id?.slice(-10) ?? p.id.slice(0, 8),
+      razorpay_payment_id: p.razorpay_payment_id ?? null,
+      razorpay_order_id: p.razorpay_order_id ?? null,
       created_at: p.created_at,
     };
   });
 
-  const rsvpRows: EventPaymentRow[] = (rsvps ?? []).map((r) => ({
-    id: r.id,
-    type: 'rsvp' as const,
-    name: r.name,
-    email: r.email,
-    amount: Number(r.entry_fee_amount),
-    status: r.payment_status,
-    paid_at: r.paid_at,
-    reference: r.razorpay_payment_id?.slice(-10) ?? r.id.slice(0, 8),
-    created_at: r.created_at,
-  }));
+  const rsvpRows: EventPaymentRow[] = (rsvps ?? []).map((r) => {
+    const amount = Number(r.entry_fee_amount);
+    const platformFee = Number(r.platform_fee_amount ?? 0);
+    const organizerNet = Number(r.organizer_net_amount ?? amount - platformFee);
+    return {
+      id: r.id,
+      type: 'rsvp' as const,
+      name: r.name,
+      email: r.email,
+      amount,
+      platform_fee_amount: platformFee,
+      organizer_net_amount: organizerNet,
+      status: r.payment_status,
+      paid_at: r.paid_at,
+      reference: r.razorpay_payment_id?.slice(-10) ?? r.id.slice(0, 8),
+      razorpay_payment_id: r.razorpay_payment_id ?? null,
+      razorpay_order_id: r.razorpay_order_id ?? null,
+      created_at: r.created_at,
+    };
+  });
 
   return [...vendorRows, ...rsvpRows].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),

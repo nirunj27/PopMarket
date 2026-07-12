@@ -93,16 +93,24 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         />
         <div className="flex flex-wrap gap-2">
           {isDraft && <PublishButton eventId={event.id} />}
-          {event.status === 'published' && (
-            <Link
-              href={`/e/${event.slug}`}
-              target="_blank"
-              className={cn(buttonVariants({ variant: 'outline' }))}
-            >
-              <ExternalLink className="h-4 w-4" />
-              Public page
-            </Link>
-          )}
+          <Link
+            href={`/e/${event.slug}`}
+            target={isDraft ? undefined : '_blank'}
+            rel={isDraft ? undefined : 'noopener noreferrer'}
+            className={cn(buttonVariants({ variant: 'outline' }))}
+          >
+            <ExternalLink className="h-4 w-4" />
+            {isDraft ? 'Preview public page' : 'Public page'}
+          </Link>
+          <Link
+            href={`/apply/${event.slug}`}
+            target={isDraft ? undefined : '_blank'}
+            rel={isDraft ? undefined : 'noopener noreferrer'}
+            className={cn(buttonVariants({ variant: 'outline' }))}
+          >
+            <ExternalLink className="h-4 w-4" />
+            {isDraft ? 'Preview vendor apply' : 'Vendor apply'}
+          </Link>
           <DeleteEventButton eventId={event.id} eventTitle={event.title} />
         </div>
       </div>
@@ -162,6 +170,11 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
                 value={`From ${formatTime(event.setup_time)}`}
               />
             )}
+            <Detail
+              icon={Calendar}
+              label="Created"
+              value={formatDate(event.created_at)}
+            />
             <Detail icon={MapPin} label="Venue" value={event.venue_name} sub={event.venue_address} />
             <Detail icon={Grid3x3} label="Stall layout" value={`${event.stall_rows}×${event.stall_cols} grid`} sub={`${assignableStalls.length} bays for vendors`} />
             <Detail icon={Users} label="Visitor capacity" value={`${event.visitor_capacity.toLocaleString('en-IN')} guests`} />
@@ -186,20 +199,14 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
         <Card className="card-elevated border-border/60">
           <CardHeader>
             <CardTitle className="text-lg">Share links</CardTitle>
-            {!isDraft && (
-              <p className="text-xs text-muted-foreground">Share after publishing</p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {isDraft
+                ? 'Open while signed in to preview. Guests and vendors only see these after you publish.'
+                : 'Share with vendors and guests'}
+            </p>
           </CardHeader>
           <CardContent>
-            {isDraft ? (
-              <p className="text-sm text-muted-foreground">
-                Publish this event to activate public and vendor links. Preview URLs below for your
-                reference.
-              </p>
-            ) : null}
-            <div className={isDraft ? 'mt-4 opacity-80' : ''}>
-              <EventShareLinks publicUrl={publicUrl} applyUrl={applyUrl} />
-            </div>
+            <EventShareLinks publicUrl={publicUrl} applyUrl={applyUrl} />
           </CardContent>
         </Card>
       </div>

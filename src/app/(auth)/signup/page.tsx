@@ -3,10 +3,11 @@ import Link from 'next/link';
 import { SignupForm } from '@/components/forms/signup-form';
 import { AuthHeader } from '@/components/layout/auth-header';
 import { PageContainer } from '@/components/layout/page-container';
+import { getPublicPlatformFeePercent } from '@/lib/platform/admin';
 import { parseOrganizerPlan } from '@/lib/plans';
 
 export const metadata: Metadata = {
-  title: 'Sign up',
+  title: 'Organizer sign up',
 };
 
 interface SignupPageProps {
@@ -16,14 +17,15 @@ interface SignupPageProps {
 export default async function SignupPage({ searchParams }: SignupPageProps) {
   const { plan: planParam } = await searchParams;
   const plan = parseOrganizerPlan(planParam);
+  const feePercent = await getPublicPlatformFeePercent();
 
   return (
     <div className="market-pattern flex min-h-screen flex-col">
       <AuthHeader />
-      <main id="main-content" className="flex flex-1 items-center">
-        <PageContainer className="flex w-full justify-center py-12">
-          <div className="w-full max-w-md space-y-6">
-            <SignupForm plan={plan} />
+      <main id="main-content" className="flex flex-1">
+        <PageContainer className="flex w-full justify-center py-8 sm:py-12">
+          <div className="w-full max-w-4xl space-y-6">
+            <SignupForm plan={plan} feePercent={feePercent} />
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{' '}
               <Link

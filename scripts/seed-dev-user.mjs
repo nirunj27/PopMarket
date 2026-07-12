@@ -1,5 +1,5 @@
 /**
- * Creates a demo organizer account in Supabase for local development.
+ * Creates demo organizer + platform superadmin accounts for local development.
  *
  * Usage: npm run seed:dev
  *
@@ -24,14 +24,96 @@ function loadEnvLocal() {
   }
 }
 
-const DEMO_USER = {
-  email: 'organizer@popmarket.dev',
-  password: 'Demo@12345',
-  fullName: 'Demo Organizer',
-  companyName: 'PopMarket Events',
-};
+const DEMO_USERS = [
+  {
+    email: 'organizer@popmarket.dev',
+    password: 'Demo@12345',
+    fullName: 'Demo Organizer',
+    companyName: 'PopMarket Events',
+    phone: '9876543210',
+    address: '12 Market Lane, Andheri West, Mumbai 400053',
+    role: 'organizer',
+    plan: 'paid',
+    portal: 'http://localhost:3000/login',
+  },
+  {
+    email: 'platform@popmarket.dev',
+    password: 'Admin@12345',
+    fullName: 'Platform Admin',
+    companyName: 'PopMarket OS',
+    phone: '9999900000',
+    address: 'PopMarket HQ, Bengaluru',
+    role: 'superadmin',
+    plan: 'paid',
+    portal: 'http://localhost:3000/admin/login',
+  },
+];
 
-async function seedDevUser() {
+async function upsertDemoUser(supabase, user) {
+  const { data: existing } = await supabase.auth.admin.listUsers({ perPage: 200 });
+  const found = existing.users.find((u) => u.email === user.email);
+
+  if (found) {
+    await supabase.auth.admin.updateUserById(found.id, {
+      password: user.password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: user.fullName,
+        company_name: user.companyName,
+        phone: user.phone,
+        address: user.address,
+        plan: user.plan,
+        role: user.role,
+      },
+    });
+
+    await supabase.from('profiles').upsert({
+      id: found.id,
+      full_name: user.fullName,
+      company_name: user.companyName,
+      phone: user.phone,
+      address: user.address,
+      role: user.role,
+    });
+
+    console.log(`Updated: ${user.email} (${user.role})`);
+    return;
+  }
+
+  const { data, error } = await supabase.auth.admin.createUser({
+    email: user.email,
+    password: user.password,
+    email_confirm: true,
+    user_metadata: {
+      full_name: user.fullName,
+      company_name: user.companyName,
+      phone: user.phone,
+      address: user.address,
+      plan: user.plan,
+      role: user.role,
+    },
+  });
+
+  if (error) {
+    console.error(`Failed to create ${user.email}:`, error.message);
+    process.exit(1);
+  }
+
+  if (data.user) {
+    await supabase.from('profiles').upsert({
+      id: data.user.id,
+      full_name: user.fullName,
+      company_name: user.companyName,
+      phone: user.phone,
+      address: user.address,
+      role: user.role,
+    });
+  }
+
+  console.log(`Created: ${user.email} (${user.role})`);
+}
+
+async function seedDevUsers() {
   loadEnvLocal();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -46,63 +128,21 @@ async function seedDevUser() {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { data: existing } = await supabase.auth.admin.listUsers();
-  const found = existing.users.find((u) => u.email === DEMO_USER.email);
-
-  if (found) {
-    await supabase.auth.admin.updateUserById(found.id, {
-      password: DEMO_USER.password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: DEMO_USER.fullName,
-        company_name: DEMO_USER.companyName,
-        plan: 'paid',
-      },
-    });
-
-    await supabase.from('profiles').upsert({
-      id: found.id,
-      full_name: DEMO_USER.fullName,
-      company_name: DEMO_USER.companyName,
-    });
-
-    console.log('Demo user already exists — password reset and profile updated.');
-  } else {
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: DEMO_USER.email,
-      password: DEMO_USER.password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: DEMO_USER.fullName,
-        company_name: DEMO_USER.companyName,
-        plan: 'paid',
-      },
-    });
-
-    if (error) {
-      console.error('Failed to create demo user:', error.message);
-      process.exit(1);
-    }
-
-    if (data.user) {
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        full_name: DEMO_USER.fullName,
-        company_name: DEMO_USER.companyName,
-      });
-    }
-
-    console.log('Demo user created successfully.');
+  for (const user of DEMO_USERS) {
+    await upsertDemoUser(supabase, user);
   }
 
-  console.log('\n--- Demo sign-in credentials ---');
-  console.log(`Email:    ${DEMO_USER.email}`);
-  console.log(`Password: ${DEMO_USER.password}`);
-  console.log('--------------------------------\n');
-  console.log('Sign in at http://localhost:3000/login');
+  console.log('\n--- Demo credentials ---');
+  for (const user of DEMO_USERS) {
+    console.log(`\n${user.role.toUpperCase()}`);
+    console.log(`  Email:    ${user.email}`);
+    console.log(`  Password: ${user.password}`);
+    console.log(`  Portal:   ${user.portal}`);
+  }
+  console.log('\n------------------------\n');
 }
 
-seedDevUser().catch((err) => {
+seedDevUsers().catch((err) => {
   console.error(err);
   process.exit(1);
 });

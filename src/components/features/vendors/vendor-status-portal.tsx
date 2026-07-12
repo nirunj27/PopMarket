@@ -164,9 +164,8 @@ export function VendorStatusPortal({
         {application.status === 'pending' && (
           <PortalPanel title="What happens next">
             <p className="text-xs leading-relaxed text-muted-foreground">
-              Your application is with the organizer for review. You will receive an email when
-              your status changes to approved, waitlisted, or rejected. No action is needed right
-              now — bookmark this page to check back anytime.
+              Your application is with the organizer for review. Bookmark this page and check back
+              for approval, waitlist, or rejection updates. No action is needed right now.
             </p>
           </PortalPanel>
         )}
@@ -175,7 +174,7 @@ export function VendorStatusPortal({
           <PortalPanel title="Waitlist">
             <p className="text-xs leading-relaxed text-muted-foreground">
               You are on the waitlist. If a bay opens up, the organizer may approve your
-              application and you will be notified by email.
+              application — check this status page for updates.
             </p>
           </PortalPanel>
         )}

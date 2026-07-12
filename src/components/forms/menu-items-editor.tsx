@@ -3,6 +3,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import type { MenuItem } from '@/lib/menu';
 import { compressMenuImage } from '@/lib/image/compress-menu-image';
+import { cropMenuRegionToDataUrl } from '@/lib/image/crop-menu-region';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { IndianRupee, Loader2, Plus, Trash2, Upload, Wand2, PenLine } from 'lucide-react';
@@ -36,12 +37,15 @@ export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps
     setExtracting(true);
     try {
       const compressed = await compressMenuImage(file);
+      const previewUrl = URL.createObjectURL(compressed);
+
       const formData = new FormData();
       formData.append('image', compressed);
       const response = await fetch('/api/extract-menu', { method: 'POST', body: formData });
       const data = (await response.json()) as { items?: MenuItem[]; error?: string };
 
       if (!response.ok || !data.items?.length) {
+        URL.revokeObjectURL(previewUrl);
         toast.error(data.error ?? 'Could not extract menu items', { duration: 6000 });
         if (data.error?.toLowerCase().includes('quota')) {
           setTab('manual');
@@ -49,8 +53,28 @@ export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps
         return;
       }
 
-      onChange(data.items);
-      toast.success(`Extracted ${data.items.length} items — review below`);
+      // Crop dish photos from the menu card using AI boxes
+      const withImages = await Promise.all(
+        data.items.map(async (item) => {
+          if (!item.box) {
+            const { box: _b, ...rest } = item;
+            return rest;
+          }
+          const imageUrl = await cropMenuRegionToDataUrl(previewUrl, item.box);
+          const { box: _box, ...rest } = item;
+          return imageUrl ? { ...rest, imageUrl } : rest;
+        }),
+      );
+
+      URL.revokeObjectURL(previewUrl);
+      onChange(withImages);
+
+      const photoCount = withImages.filter((i) => i.imageUrl).length;
+      toast.success(
+        photoCount > 0
+          ? `Extracted ${withImages.length} items · ${photoCount} dish photo${photoCount === 1 ? '' : 's'}`
+          : `Extracted ${withImages.length} items — review below (no dish photos detected; you can upload Pics)`,
+      );
     } catch {
       toast.error('Upload failed. Try again or add items manually.');
     } finally {
@@ -100,16 +124,19 @@ export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps
           </span>
           <span className="min-w-0">
             <span className="block text-xs font-semibold">
-              {extracting ? 'Reading menu…' : 'Upload menu image'}
+              {extracting ? 'Reading menu & dish photos…' : 'Upload menu image'}
             </span>
-            <span className="text-[10px] text-muted-foreground">JPG or PNG · max 5 MB</span>
+            <span className="text-[10px] text-muted-foreground">
+              JPG or PNG · extracts names, prices, and dish pics when present
+            </span>
           </span>
         </label>
       )}
 
       {showList && listItems.length > 0 && (
         <div className="overflow-hidden rounded-lg border border-border/60">
-          <div className="grid grid-cols-[1fr_88px_32px] gap-2 border-b border-border/60 bg-muted/30 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="grid grid-cols-[40px_1fr_88px_32px] gap-2 border-b border-border/60 bg-muted/30 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span>Pic</span>
             <span>Item</span>
             <span className="text-right">Price</span>
             <span className="sr-only">Remove</span>
@@ -118,8 +145,33 @@ export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps
             {listItems.map((item, index) => (
               <li
                 key={index}
-                className="grid grid-cols-[1fr_88px_32px] items-center gap-2 border-b border-border/40 px-2 py-1 last:border-0 even:bg-muted/10"
+                className="grid grid-cols-[40px_1fr_88px_32px] items-center gap-2 border-b border-border/40 px-2 py-1.5 last:border-0 even:bg-muted/10"
               >
+                <label className="relative flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted/20 hover:border-primary/40">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        if (typeof reader.result === 'string') {
+                          updateItem(index, { imageUrl: reader.result });
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    aria-label={`Upload photo for item ${index + 1}`}
+                  />
+                  {item.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                  )}
+                </label>
                 <Input
                   className="h-8 rounded-md border-border/60 bg-background text-xs"
                   placeholder="Dish name"
@@ -144,7 +196,7 @@ export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps
                   type="button"
                   onClick={() => (listItems.length > 1 ? removeItem(index) : undefined)}
                   disabled={listItems.length <= 1}
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:invisible"
+                  className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:invisible"
                   aria-label={`Remove item ${index + 1}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -156,7 +208,7 @@ export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps
             <button
               type="button"
               onClick={addItem}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+              className="inline-flex cursor-pointer items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
             >
               <Plus className="h-3 w-3" />
               Add item

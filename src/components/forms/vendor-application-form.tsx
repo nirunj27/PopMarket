@@ -28,6 +28,8 @@ interface VendorApplicationFormProps {
   stalls: StallWithAssignment[];
   baseStallFee: number;
   vendorTerms: string;
+  /** Organizer draft preview — form visible but submit blocked */
+  previewMode?: boolean;
 }
 
 export function VendorApplicationForm({
@@ -36,8 +38,9 @@ export function VendorApplicationForm({
   stalls,
   baseStallFee,
   vendorTerms,
+  previewMode = false,
 }: VendorApplicationFormProps) {
-  const [success, setSuccess] = useState<{ token: string; emailSent: boolean } | null>(null);
+  const [success, setSuccess] = useState<{ token: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
@@ -73,6 +76,10 @@ export function VendorApplicationForm({
   };
 
   const onSubmit = async (data: VendorApplicationInput) => {
+    if (previewMode) {
+      toast.info('Publish the event to accept real vendor applications.');
+      return;
+    }
     setIsLoading(true);
 
     const formData = new FormData();
@@ -105,13 +112,8 @@ export function VendorApplicationForm({
 
     setSuccess({
       token: result.data?.token ?? '',
-      emailSent: result.data?.emailSent ?? false,
     });
-    toast.success(
-      result.data?.emailSent
-        ? 'Submitted! Check your email for the status link.'
-        : 'Submitted! Copy your status link below.',
-    );
+    toast.success('Submitted! Copy your status link below.');
     setIsLoading(false);
   };
 
@@ -122,8 +124,6 @@ export function VendorApplicationForm({
           path={`/vendor/${success.token}`}
           title="Application submitted!"
           description={`Your application for ${eventTitle} has been received. Bookmark this link to track approval, stall assignment, and payment.`}
-          emailSent={success.emailSent}
-          emailHint="We emailed this link to the address you provided."
         />
       </div>
     );
@@ -292,13 +292,15 @@ export function VendorApplicationForm({
 
       <div className="sticky bottom-2 z-10 flex flex-col gap-2 rounded-lg border border-border bg-card/95 p-2 shadow-md backdrop-blur-sm sm:flex-row sm:items-center">
         <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">
-          {acceptedTerms
-            ? 'Ready to submit — you will receive a link to track approval and pay the stall fee.'
-            : 'Accept the terms above to enable submission.'}
+          {previewMode
+            ? 'Draft preview — submit is disabled until you publish.'
+            : acceptedTerms
+              ? 'Ready to submit — you will receive a link to track approval and pay the stall fee.'
+              : 'Accept the terms above to enable submission.'}
         </p>
         <button
           type="submit"
-          disabled={isLoading || !acceptedTerms}
+          disabled={isLoading || !acceptedTerms || previewMode}
           className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 sm:w-auto sm:min-w-[180px]"
         >
           {isLoading ? (

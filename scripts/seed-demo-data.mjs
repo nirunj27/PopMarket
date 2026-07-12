@@ -351,10 +351,14 @@ async function seedDemoData() {
 
       if (vendor.payment) {
         const premium = vendor.stallCode === 'C3' || vendor.stallCode === 'D4' ? 500 : 0;
+        const amount = 3500 + premium;
+        const platformFee = Math.round((amount * 5) / 100);
         const { error: payError } = await supabase.from('payments').insert({
           event_id: mainEvent.id,
           application_id: app.id,
-          amount: 3500 + premium,
+          amount,
+          platform_fee_amount: platformFee,
+          organizer_net_amount: amount - platformFee,
           status: vendor.payment,
           paid_at: vendor.payment === 'paid' ? new Date().toISOString() : null,
           razorpay_payment_id: vendor.payment === 'paid' ? `pay_demo_${token.slice(0, 8)}` : null,
@@ -373,6 +377,8 @@ async function seedDemoData() {
       status: 'confirmed',
       access_token: TOKENS.rsvpConfirmed,
       entry_fee_amount: 396,
+      platform_fee_amount: 20,
+      organizer_net_amount: 376,
       payment_status: 'paid',
       paid_at: new Date().toISOString(),
       razorpay_payment_id: 'pay_demo_rsvpconfirmed',
@@ -385,6 +391,8 @@ async function seedDemoData() {
       status: 'confirmed',
       access_token: TOKENS.rsvpPendingFee,
       entry_fee_amount: 198,
+      platform_fee_amount: 10,
+      organizer_net_amount: 188,
       payment_status: 'pending',
     },
     {
@@ -394,6 +402,8 @@ async function seedDemoData() {
       status: 'waitlisted',
       access_token: TOKENS.rsvpWaitlisted,
       entry_fee_amount: 0,
+      platform_fee_amount: 0,
+      organizer_net_amount: 0,
       payment_status: 'none',
     },
   ];
@@ -408,6 +418,9 @@ async function seedDemoData() {
 
   // Extra RSVPs to show capacity usage on public page
   for (let i = 1; i <= 8; i++) {
+    const entry = 198;
+    const fee = Math.round((entry * 5) / 100);
+    const paid = i % 2 === 0;
     await supabase.from('visitor_rsvps').insert({
       event_id: mainEvent.id,
       name: `Demo Guest ${i}`,
@@ -415,8 +428,11 @@ async function seedDemoData() {
       party_size: 2,
       status: 'confirmed',
       access_token: `demoguest${String(i).padStart(2, '0')}rsvp000000`,
-      entry_fee_amount: 198,
-      payment_status: i % 2 === 0 ? 'paid' : 'none',
+      entry_fee_amount: entry,
+      platform_fee_amount: paid ? fee : 0,
+      organizer_net_amount: paid ? entry - fee : 0,
+      payment_status: paid ? 'paid' : 'none',
+      paid_at: paid ? new Date().toISOString() : null,
     });
   }
 

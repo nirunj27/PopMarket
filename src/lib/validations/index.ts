@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { optionalString, requiredString } from '@/lib/validations/helpers';
 
 const phoneRegex = /^(\+91[\s-]?)?[6-9]\d{9}$/;
 const emailSchema = z.string().email('Please enter a valid email address').max(255);
@@ -17,7 +18,43 @@ export const signupSchema = z
   .object({
     fullName: z.string().min(2, 'Name must be at least 2 characters').max(100),
     email: emailSchema,
-    companyName: z.string().max(100).optional(),
+    companyName: z
+      .string()
+      .min(2, 'Company / brand name must be at least 2 characters')
+      .max(100, 'Company name cannot exceed 100 characters'),
+    phone: z
+      .string()
+      .min(10, 'Enter a valid Indian mobile number')
+      .regex(phoneRegex, 'Please enter a valid Indian mobile number (10 digits)'),
+    whatsapp: z
+      .string()
+      .regex(phoneRegex, 'Please enter a valid WhatsApp number')
+      .or(z.literal(''))
+      .optional(),
+    address: z
+      .string()
+      .min(10, 'Enter a complete street address (at least 10 characters)')
+      .max(300, 'Address cannot exceed 300 characters'),
+    city: z.string().min(1, 'Please select a city'),
+    pincode: z
+      .string()
+      .regex(/^[1-9][0-9]{5}$/, 'Enter a valid 6-digit Indian PIN code'),
+    gstin: z
+      .string()
+      .regex(
+        /^$|^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+        'Enter a valid GSTIN or leave blank',
+      )
+      .optional(),
+    website: z
+      .string()
+      .url('Enter a valid URL (https://…)')
+      .or(z.literal(''))
+      .optional(),
+    about: z
+      .string()
+      .max(500, 'About cannot exceed 500 characters')
+      .optional(),
     password: z
       .string()
       .min(8, 'Password must be at least 8 characters')
@@ -26,6 +63,9 @@ export const signupSchema = z
       .regex(/[a-z]/, 'Must contain at least one lowercase letter')
       .regex(/[0-9]/, 'Must contain at least one number'),
     confirmPassword: z.string(),
+    acceptedTerms: z.boolean().refine((v) => v === true, {
+      message: 'You must accept the Organizer Terms & Conditions to continue',
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
@@ -38,9 +78,10 @@ export const eventSchema = z
       .string()
       .min(3, 'Event title must be at least 3 characters')
       .max(120, 'Event title cannot exceed 120 characters'),
-    description: z
-      .preprocess((val) => (val === undefined || val === null ? '' : val), z.string().max(2000))
-      .optional(),
+    description: z.preprocess(
+      (val) => (val === undefined || val === null ? '' : val),
+      z.string().max(2000).optional(),
+    ),
     venueName: z
       .string()
       .min(2, 'Please enter a venue name (at least 2 characters)')
@@ -49,14 +90,11 @@ export const eventSchema = z
       .string()
       .min(10, 'Please enter a complete street address (at least 10 characters)')
       .max(300, 'Address cannot exceed 300 characters'),
-    city: z.string().min(1, 'Please select a city from the list'),
-    eventDate: z.string().min(1, 'Please select an event date'),
-    setupTime: z.preprocess(
-      (val) => (val === undefined || val === null ? '' : val),
-      z.string().optional(),
-    ),
-    startTime: z.string().min(1, 'Please select a market start time'),
-    endTime: z.string().min(1, 'Please select a market end time'),
+    city: requiredString('Please select a city from the list'),
+    eventDate: requiredString('Please select an event date'),
+    setupTime: optionalString(),
+    startTime: requiredString('Please select a market start time'),
+    endTime: requiredString('Please select a market end time'),
     stallRows: z.coerce
       .number({ error: 'Stall rows must be a number' })
       .int('Stall rows must be a whole number')
@@ -128,46 +166,47 @@ export const eventSchema = z
     }
   });
 
-export const vendorApplicationSchema = z.object({
-  businessName: z.string().min(2, 'Business name is required').max(120),
-  ownerName: z.string().min(2, 'Owner name is required').max(100),
-  email: emailSchema,
-  phone: z.string().regex(phoneRegex, 'Please enter a valid Indian mobile number'),
-  cuisineType: z.string().min(1, 'Please select a cuisine type'),
-  menuDescription: z.string().max(1000).optional().or(z.literal('')),
-  menuItems: z.string().optional().or(z.literal('')),
-  vendorType: z.enum(['food_truck', 'food_stall'], {
-    error: 'Please select truck or stall type',
-  }),
-  truckName: z.string().min(2, 'Truck/stall name is required').max(80),
-  truckLengthFt: z
-    .union([
-      z.literal(''),
-      z.coerce.number().min(8, 'Truck length must be at least 8 feet').max(40),
-    ])
-    .optional()
-    .transform((val) => (val === '' || val === undefined ? undefined : val)),
-  preferredStallId: z
-    .string()
-    .uuid('Invalid stall selection')
-    .optional()
-    .or(z.literal(''))
-    .transform((val) => (val === '' ? undefined : val)),
-  needsPower: z.boolean(),
-  needsWater: z.boolean(),
-  powerRequirements: z.string().max(200).optional().or(z.literal('')),
-  instagramHandle: z
-    .string()
-    .max(50)
-    .optional()
-    .or(z.literal(''))
-    .refine((val) => !val || /^@?[\w.]+$/.test(val), 'Invalid Instagram handle'),
-  acceptedTerms: z.boolean().refine((v) => v === true, {
-    message: 'You must accept the terms and conditions to submit your application',
-  }),
-})
+export const vendorApplicationSchema = z
+  .object({
+    businessName: z.string().min(2, 'Business name is required').max(120),
+    ownerName: z.string().min(2, 'Owner name is required').max(100),
+    email: emailSchema,
+    phone: z.string().regex(phoneRegex, 'Please enter a valid Indian mobile number'),
+    cuisineType: requiredString('Please select a cuisine type'),
+    menuDescription: z.string().max(1000).optional().or(z.literal('')),
+    menuItems: z.string().optional().or(z.literal('')),
+    vendorType: z.enum(['food_truck', 'food_stall'], {
+      error: 'Please select truck or stall type',
+    }),
+    truckName: z.string().min(2, 'Truck/stall name is required').max(80),
+    truckLengthFt: z
+      .union([
+        z.literal(''),
+        z.coerce.number().min(8, 'Truck length must be at least 8 feet').max(40),
+      ])
+      .optional()
+      .transform((val) => (val === '' || val === undefined ? undefined : val)),
+    preferredStallId: z
+      .string()
+      .uuid('Invalid stall selection')
+      .optional()
+      .or(z.literal(''))
+      .transform((val) => (val === '' ? undefined : val)),
+    needsPower: z.boolean(),
+    needsWater: z.boolean(),
+    powerRequirements: z.string().max(200).optional().or(z.literal('')),
+    instagramHandle: z
+      .string()
+      .max(50)
+      .optional()
+      .or(z.literal(''))
+      .refine((val) => !val || /^@?[\w.]+$/.test(val), 'Invalid Instagram handle'),
+    acceptedTerms: z.boolean().refine((v) => v === true, {
+      message: 'You must accept the terms and conditions to submit your application',
+    }),
+  })
   .superRefine((data, ctx) => {
-    let items: { name: string; price: number }[] = [];
+    let items: { name: string; price: number; imageUrl?: string }[] = [];
     try {
       items = JSON.parse(data.menuItems || '[]');
     } catch {
@@ -215,10 +254,12 @@ export const stallLayoutCellSchema = z.object({
   col: z.number().int().min(0),
   zone: z.enum(['food_truck', 'food_stall', 'blocked', 'entrance', 'stage']),
   isPremium: z.boolean().optional(),
-  premiumFee: z.preprocess(
-    (val) => (val === undefined || val === null ? 0 : val),
-    z.coerce.number().min(0).max(100000),
-  ).optional(),
+  premiumFee: z
+    .preprocess(
+      (val) => (val === undefined || val === null ? 0 : val),
+      z.coerce.number().min(0).max(100000),
+    )
+    .optional(),
 });
 
 export const stallLayoutSchema = z.array(stallLayoutCellSchema).min(9);
@@ -230,9 +271,20 @@ export const vendorTermsSchema = z.object({
     .max(20000, 'Terms cannot exceed 20,000 characters'),
 });
 
+export const platformSettingsSchema = z.object({
+  platformFeePercent: z.coerce
+    .number()
+    .min(0, 'Fee cannot be negative')
+    .max(50, 'Fee cannot exceed 50%'),
+  razorpayKeyId: z.string().optional().or(z.literal('')),
+  razorpayKeySecret: z.string().optional().or(z.literal('')),
+  platformEnabled: z.boolean(),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type SignupInput = z.infer<typeof signupSchema>;
 export type EventInput = z.infer<typeof eventSchema>;
 export type VendorApplicationInput = z.infer<typeof vendorApplicationSchema>;
 export type RsvpInput = z.infer<typeof rsvpSchema>;
 export type ApplicationReviewInput = z.infer<typeof applicationReviewSchema>;
+export type PlatformSettingsInput = z.infer<typeof platformSettingsSchema>;

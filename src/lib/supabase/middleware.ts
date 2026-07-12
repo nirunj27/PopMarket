@@ -1,9 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { isSuperadminEmail } from '@/lib/env';
 
-const PUBLIC_ROUTES = ['/', '/login', '/signup'];
-const AUTH_ROUTES = ['/login', '/signup'];
-const PROTECTED_PREFIX = '/dashboard';
+const PUBLIC_PREFIXES = ['/e/', '/apply/', '/vendor/', '/rsvp/'];
+const AUTH_ROUTES = ['/login', '/signup', '/admin/login'];
+const PUBLIC_EXACT = ['/', '/terms'];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -35,27 +36,63 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isPublicRoute =
-    PUBLIC_ROUTES.includes(pathname) ||
-    pathname.startsWith('/e/') ||
-    pathname.startsWith('/apply/') ||
-    pathname.startsWith('/vendor/') ||
-    pathname.startsWith('/rsvp/');
 
-  if (!user && pathname.startsWith(PROTECTED_PREFIX)) {
+  const isPublic =
+    PUBLIC_EXACT.includes(pathname) ||
+    AUTH_ROUTES.includes(pathname) ||
+    PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+
+  const isAdminArea = pathname.startsWith('/admin') && pathname !== '/admin/login';
+  const isOrganizerArea = pathname.startsWith('/dashboard');
+
+  // Unauthenticated → protect private areas
+  if (!user && (isOrganizerArea || isAdminArea)) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = '/login';
+    redirectUrl.pathname = isAdminArea ? '/admin/login' : '/login';
     redirectUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(redirectUrl);
   }
 
+  // Resolve role when needed
+  let role: 'organizer' | 'superadmin' | null = null;
+  if (user) {
+    const metaRole = user.user_metadata?.role;
+    if (metaRole === 'superadmin' || metaRole === 'organizer') {
+      role = metaRole;
+    } else if (isSuperadminEmail(user.email)) {
+      role = 'superadmin';
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+      role = profile?.role === 'superadmin' ? 'superadmin' : 'organizer';
+    }
+  }
+
+  // Logged-in users on auth pages → send to their home
   if (user && AUTH_ROUTES.includes(pathname)) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = role === 'superadmin' ? '/admin' : '/dashboard';
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Organizers cannot access admin console
+  if (user && isAdminArea && role !== 'superadmin') {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/dashboard';
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (!user && !isPublicRoute && pathname.startsWith(PROTECTED_PREFIX)) {
+  // Superadmins cannot use the organizer client dashboard
+  if (user && isOrganizerArea && role === 'superadmin') {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = '/admin';
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (!user && !isPublic && (isOrganizerArea || isAdminArea)) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Check, Copy, ExternalLink, Mail } from 'lucide-react';
+import { Check, Copy, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -11,8 +11,6 @@ interface CopyableStatusLinkProps {
   path: string;
   title: string;
   description: string;
-  emailSent?: boolean;
-  emailHint?: string;
   className?: string;
   compact?: boolean;
 }
@@ -21,8 +19,6 @@ export function CopyableStatusLink({
   path,
   title,
   description,
-  emailSent = false,
-  emailHint,
   className,
   compact = false,
 }: CopyableStatusLinkProps) {
@@ -66,7 +62,13 @@ export function CopyableStatusLink({
         </p>
         <p className="break-all font-mono text-xs font-medium text-foreground">{fullUrl}</p>
         <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap">
-          <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => void handleCopy()}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => void handleCopy()}
+          >
             {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             {copied ? 'Copied!' : 'Copy link'}
           </Button>
@@ -75,7 +77,7 @@ export function CopyableStatusLink({
             target="_blank"
             rel="noopener noreferrer"
             className={cn(
-              'inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold sm:w-auto',
+              'inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold sm:w-auto',
               'bg-primary text-primary-foreground shadow-md hover:bg-primary/90',
             )}
           >
@@ -85,16 +87,9 @@ export function CopyableStatusLink({
         </div>
       </div>
 
-      {emailSent ? (
-        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Mail className="h-3.5 w-3.5 shrink-0" />
-          {emailHint ?? 'A confirmation email was sent with this link.'}
-        </p>
-      ) : (
-        <p className="rounded-md bg-warning/10 px-2.5 py-1.5 text-xs text-warning">
-          Email was not sent — save or copy this link to check your application status later.
-        </p>
-      )}
+      <p className="rounded-md bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
+        Save this link — you&apos;ll need it to check status and complete payment.
+      </p>
     </div>
   );
 }

@@ -5,7 +5,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-muted/20">
       <DashboardShell>
-        <PageContainer tight className="py-8 lg:py-10">
+        <PageContainer tight className="py-6 sm:py-8 lg:py-10">
           {children}
         </PageContainer>
       </DashboardShell>

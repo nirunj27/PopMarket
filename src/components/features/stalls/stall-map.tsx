@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { assignStallAction, ensureEventStallsAction } from '@/lib/actions/events';
 import type { StallWithAssignment } from '@/types';
 import { StallFloorGrid } from '@/components/features/stalls/stall-floor-grid';
@@ -37,6 +38,7 @@ export function StallMap({
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const lockedCount = stalls.filter(isStallPaymentLocked).length;
   const vendorsPaid = paidVendorCount ?? lockedCount;
@@ -68,6 +70,7 @@ export function StallMap({
       }
       toast.success('Vendor assigned to stall');
       setSelectedStall(null);
+      router.refresh();
     });
   };
 
@@ -86,6 +89,7 @@ export function StallMap({
       toast.success('Stall assignment removed');
       setPendingRemoval(null);
       setSelectedStall(null);
+      router.refresh();
     });
   };
 
@@ -112,6 +116,7 @@ export function StallMap({
         return;
       }
       toast.success(`Generated ${result.data?.count ?? 0} stall bays`);
+      router.refresh();
     });
   };
 

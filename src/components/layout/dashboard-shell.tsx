@@ -2,26 +2,28 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Calendar, Truck, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Calendar, Truck, Menu, X, Wallet, BookOpen } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { LogoutButton } from '@/components/layout/logout-button';
-
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/dashboard/events', label: 'Events', icon: Calendar },
-] as const;
+import { SidebarUserFooter } from '@/components/layout/sidebar-user-footer';
 
 interface DashboardShellProps {
   children: ReactNode;
 }
+
+const items = [
+  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+  { href: '/dashboard/events', label: 'Events', icon: Calendar },
+  { href: '/dashboard/billing', label: 'Billing', icon: Wallet },
+  { href: '/dashboard/guide', label: 'Platform guide', icon: BookOpen },
+] as const;
 
 export function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const activeLabel =
-    navItems.find(
+    items.find(
       (item) =>
         pathname === item.href ||
         (item.href !== '/dashboard' && pathname.startsWith(item.href)),
@@ -29,7 +31,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
   return (
     <>
-      {/* Mobile overlay */}
       {mobileOpen && (
         <button
           type="button"
@@ -39,7 +40,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
         />
       )}
 
-      {/* Sidebar — fixed on desktop, slide-in on mobile */}
       <aside
         id="dashboard-sidebar"
         className={cn(
@@ -60,14 +60,14 @@ export function DashboardShell({ children }: DashboardShellProps) {
             <div>
               <p className="font-display font-bold leading-tight">PopMarket</p>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Dashboard
+                Organizer
               </p>
             </div>
           </Link>
         </div>
 
         <nav className="flex-1 space-y-1 p-4" aria-label="Primary">
-          {navItems.map((item) => {
+          {items.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== '/dashboard' && pathname.startsWith(item.href));
@@ -93,14 +93,10 @@ export function DashboardShell({ children }: DashboardShellProps) {
           })}
         </nav>
 
-        <div className="border-t border-border/60 p-4">
-          <LogoutButton />
-        </div>
+        <SidebarUserFooter logoutRedirectTo="/login" roleLabel="Organizer" showPlan />
       </aside>
 
-      {/* Main column */}
       <div className="flex min-h-screen flex-col lg:pl-64">
-        {/* Sticky mobile top bar */}
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/60 glass-panel px-4 lg:hidden">
           <button
             type="button"

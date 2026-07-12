@@ -1,5 +1,5 @@
 /**
- * Adds bulk vendor applications and RSVPs to the demo event for table/pagination testing.
+ * Adds bulk vendors, RSVPs, and paid transactions for load / pagination testing.
  *
  * Usage (after demo seed):
  *   npm run seed:large
@@ -13,8 +13,9 @@ import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
 
 const DEMO_SLUG = 'corporate-lunch-market';
-const VENDOR_COUNT = 60;
-const RSVP_COUNT = 120;
+const VENDOR_COUNT = 80;
+const RSVP_COUNT = 200;
+const FEE_PERCENT = 5;
 
 const CUISINES = [
   'Indian',
@@ -49,6 +50,11 @@ function token(prefix, n) {
   return `${prefix}${String(n).padStart(6, '0')}`;
 }
 
+function splitFee(gross) {
+  const platformFee = Math.round((gross * FEE_PERCENT) / 100);
+  return { platformFee, organizerNet: Math.max(0, gross - platformFee) };
+}
+
 async function seedLargeData() {
   loadEnvLocal();
 
@@ -67,7 +73,7 @@ async function seedLargeData() {
 
   const { data: event, error: eventError } = await supabase
     .from('events')
-    .select('id, title')
+    .select('id, title, stall_fee')
     .eq('slug', DEMO_SLUG)
     .single();
 
@@ -85,11 +91,14 @@ async function seedLargeData() {
     .like('email', 'bulkvendor%@loadtest.popmarket.dev');
 
   if (existingVendors?.length) {
+    const ids = existingVendors.map((v) => v.id);
+    await supabase.from('payments').delete().in('application_id', ids);
     console.log(`  Removing ${existingVendors.length} previous bulk vendors…`);
-    await supabase.from('vendor_applications').delete().eq('event_id', event.id).like(
-      'email',
-      'bulkvendor%@loadtest.popmarket.dev',
-    );
+    await supabase
+      .from('vendor_applications')
+      .delete()
+      .eq('event_id', event.id)
+      .like('email', 'bulkvendor%@loadtest.popmarket.dev');
   }
 
   const { data: existingRsvps } = await supabase
@@ -100,10 +109,11 @@ async function seedLargeData() {
 
   if (existingRsvps?.length) {
     console.log(`  Removing ${existingRsvps.length} previous bulk RSVPs…`);
-    await supabase.from('visitor_rsvps').delete().eq('event_id', event.id).like(
-      'email',
-      'bulkguest%@loadtest.popmarket.dev',
-    );
+    await supabase
+      .from('visitor_rsvps')
+      .delete()
+      .eq('event_id', event.id)
+      .like('email', 'bulkguest%@loadtest.popmarket.dev');
   }
 
   const vendorRows = [];
@@ -133,23 +143,61 @@ async function seedLargeData() {
     });
   }
 
-  const { error: vendorInsertError } = await supabase.from('vendor_applications').insert(vendorRows);
+  const { data: insertedVendors, error: vendorInsertError } = await supabase
+    .from('vendor_applications')
+    .insert(vendorRows)
+    .select('id, status, access_token');
+
   if (vendorInsertError) throw new Error(`Vendors: ${vendorInsertError.message}`);
   console.log(`  + ${VENDOR_COUNT} vendor applications`);
+
+  const stallFee = Number(event.stall_fee) || 3500;
+  const paymentRows = [];
+  for (const app of insertedVendors ?? []) {
+    if (app.status !== 'approved') continue;
+    const n = Number(String(app.access_token).replace(/\D/g, '')) || 1;
+    const amount = stallFee + (n % 2 === 0 ? 500 : 0);
+    const { platformFee, organizerNet } = splitFee(amount);
+    const paid = n % 3 !== 0;
+    paymentRows.push({
+      event_id: event.id,
+      application_id: app.id,
+      amount,
+      platform_fee_amount: platformFee,
+      organizer_net_amount: organizerNet,
+      status: paid ? 'paid' : 'pending',
+      paid_at: paid ? new Date().toISOString() : null,
+      razorpay_payment_id: paid ? `pay_bulk_${app.access_token.slice(-8)}` : null,
+    });
+  }
+
+  if (paymentRows.length) {
+    const { error: payError } = await supabase.from('payments').insert(paymentRows);
+    if (payError) throw new Error(`Payments: ${payError.message}`);
+    console.log(`  + ${paymentRows.length} vendor payment rows`);
+  }
 
   const rsvpRows = [];
   for (let i = 1; i <= RSVP_COUNT; i++) {
     const waitlisted = i % 17 === 0;
+    const party = (i % 4) + 1;
+    const entry = waitlisted ? 0 : 99 * party;
+    const paid = !waitlisted && i % 3 === 0;
+    const pending = !waitlisted && i % 3 === 1;
+    const { platformFee, organizerNet } = paid ? splitFee(entry) : { platformFee: 0, organizerNet: 0 };
     rsvpRows.push({
       event_id: event.id,
       name: `Load Test Guest ${i}`,
       email: `bulkguest${String(i).padStart(3, '0')}@loadtest.popmarket.dev`,
       phone: `91000${String(10000 + i).slice(-5)}`,
-      party_size: (i % 4) + 1,
+      party_size: party,
       status: waitlisted ? 'waitlisted' : 'confirmed',
       access_token: token('bulkrspv', i),
-      entry_fee_amount: waitlisted ? 0 : 99 * ((i % 4) + 1),
-      payment_status: i % 3 === 0 ? 'paid' : i % 3 === 1 ? 'pending' : 'none',
+      entry_fee_amount: entry,
+      platform_fee_amount: platformFee,
+      organizer_net_amount: organizerNet,
+      payment_status: paid ? 'paid' : pending ? 'pending' : 'none',
+      paid_at: paid ? new Date().toISOString() : null,
     });
   }
 
@@ -157,18 +205,104 @@ async function seedLargeData() {
   if (rsvpInsertError) throw new Error(`RSVPs: ${rsvpInsertError.message}`);
   console.log(`  + ${RSVP_COUNT} visitor RSVPs`);
 
+  // Second published market for admin multi-event views
+  const { data: organizer } = await supabase
+    .from('events')
+    .select('organizer_id')
+    .eq('id', event.id)
+    .single();
+
+  if (organizer?.organizer_id) {
+    const { data: existingNight } = await supabase
+      .from('events')
+      .select('id')
+      .eq('slug', 'night-bazaar-market')
+      .maybeSingle();
+
+    if (existingNight) {
+      await supabase.from('events').delete().eq('id', existingNight.id);
+    }
+
+    const { data: nightEvent, error: nightError } = await supabase
+      .from('events')
+      .insert({
+        organizer_id: organizer.organizer_id,
+        title: 'Night Bazaar Market',
+        slug: 'night-bazaar-market',
+        description: 'Evening street-food market for load testing public pages and admin lists.',
+        venue_name: 'Phoenix Mills Courtyard',
+        venue_address: 'Lower Parel',
+        city: 'Mumbai',
+        event_date: '2026-09-12',
+        setup_time: '16:00',
+        start_time: '18:00',
+        end_time: '23:00',
+        stall_rows: 5,
+        stall_cols: 6,
+        visitor_capacity: 1200,
+        stall_fee: 4500,
+        rsvp_entry_fee: 149,
+        status: 'published',
+      })
+      .select('id')
+      .single();
+
+    if (nightError) throw new Error(`Night event: ${nightError.message}`);
+
+    const nightVendors = [];
+    for (let i = 1; i <= 25; i++) {
+      nightVendors.push({
+        event_id: nightEvent.id,
+        business_name: `Night Market Stall ${i}`,
+        owner_name: `Night Vendor ${i}`,
+        email: `nightvendor${String(i).padStart(3, '0')}@loadtest.popmarket.dev`,
+        phone: `92000${String(10000 + i).slice(-5)}`,
+        cuisine_type: CUISINES[i % CUISINES.length],
+        vendor_type: i % 2 === 0 ? 'food_stall' : 'food_truck',
+        status: STATUSES[i % STATUSES.length],
+        access_token: token('nightvnd', i),
+        menu_description: `Night market menu ${i}`,
+        menu_items: [{ name: 'Signature Plate', price: 150 + i }],
+      });
+    }
+    const { error: nvErr } = await supabase.from('vendor_applications').insert(nightVendors);
+    if (nvErr) throw new Error(`Night vendors: ${nvErr.message}`);
+
+    const nightRsvps = [];
+    for (let i = 1; i <= 40; i++) {
+      const entry = 149 * ((i % 3) + 1);
+      const paid = i % 2 === 0;
+      const { platformFee, organizerNet } = paid ? splitFee(entry) : { platformFee: 0, organizerNet: 0 };
+      nightRsvps.push({
+        event_id: nightEvent.id,
+        name: `Night Guest ${i}`,
+        email: `nightguest${String(i).padStart(3, '0')}@loadtest.popmarket.dev`,
+        party_size: (i % 3) + 1,
+        status: 'confirmed',
+        access_token: token('nightrsvp', i),
+        entry_fee_amount: entry,
+        platform_fee_amount: platformFee,
+        organizer_net_amount: organizerNet,
+        payment_status: paid ? 'paid' : 'pending',
+        paid_at: paid ? new Date().toISOString() : null,
+      });
+    }
+    const { error: nrErr } = await supabase.from('visitor_rsvps').insert(nightRsvps);
+    if (nrErr) throw new Error(`Night RSVPs: ${nrErr.message}`);
+    console.log(`  + Night Bazaar Market (25 vendors, 40 RSVPs)`);
+  }
+
   console.log('\n--- Load test URLs ---\n');
-  console.log(`Applications table (search/sort/pagination):`);
+  console.log(`Applications table:`);
   console.log(`  ${appUrl}/dashboard/events/${event.id}/applications`);
-  console.log(`Payments history:`);
+  console.log(`Payments:`);
   console.log(`  ${appUrl}/dashboard/events/${event.id}/payments`);
   console.log(`Public event:`);
   console.log(`  ${appUrl}/e/${DEMO_SLUG}`);
-  console.log(`Sample bulk vendor status:`);
-  console.log(`  ${appUrl}/vendor/${token('bulkvendor', 1)}`);
-  console.log(`Sample bulk RSVP:`);
-  console.log(`  ${appUrl}/rsvp/${token('bulkrspv', 1)}`);
-  console.log('\nDone! Large dataset ready for UI testing.\n');
+  console.log(`  ${appUrl}/e/night-bazaar-market`);
+  console.log(`Admin overview:`);
+  console.log(`  ${appUrl}/admin`);
+  console.log('\nDone! Large dataset ready.\n');
 }
 
 seedLargeData().catch((err) => {

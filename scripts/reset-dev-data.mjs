@@ -70,6 +70,7 @@ async function resetDevData() {
   console.log('Clearing application data...\n');
 
   const tables = [
+    'commission_settlements',
     'payments',
     'stall_assignments',
     'vendor_applications',

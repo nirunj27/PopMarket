@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { reviewApplicationAction } from '@/lib/actions/events';
 import { APPLICATION_STATUS_CONFIG, PAYMENT_STATUS_CONFIG } from '@/lib/constants';
 import type { VendorApplicationWithDetails } from '@/types';
@@ -42,6 +43,7 @@ export function ApplicationTable({
   const [rejectingApp, setRejectingApp] = useState<VendorApplicationWithDetails | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   const handleReview = (applicationId: string, status: 'approved' | 'waitlisted' | 'rejected') => {
     startTransition(async () => {
@@ -62,11 +64,9 @@ export function ApplicationTable({
             ? 'Added to waitlist'
             : 'Application rejected',
       );
-      if (result.data?.emailSent === false) {
-        toast.warning(result.data.emailError ?? 'Status updated but email was not sent.');
-      }
       setRejectingApp(null);
       setRejectionReason('');
+      router.refresh();
     });
   };
 

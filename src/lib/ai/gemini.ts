@@ -1,4 +1,4 @@
-import { parseMenuItems } from '@/lib/menu';
+import { parseMenuItems, type MenuItem } from '@/lib/menu';
 
 const MODEL_FALLBACKS = [
   process.env.GEMINI_MODEL,
@@ -69,6 +69,9 @@ export function geminiErrorMessage(detail: string): string {
   return '';
 }
 
+const MENU_EXTRACT_PROMPT =
+  'Extract every food menu item and price from this image. When a dish photo or illustrated plate appears next to an item, also return its bounding box as fractions of the image (0–1): x,y = top-left, w,h = size. Return only valid JSON: {"items":[{"name":"string","price":number,"box":{"x":0,"y":0,"w":0,"h":0}}]}. Omit box if there is no dish photo for that row. Prices must be INR numbers without currency symbols. Skip headers, footers, addresses, and non-food lines. If price is missing for an item, use 0.';
+
 async function callGeminiModel(
   model: string,
   apiKey: string,
@@ -88,7 +91,7 @@ async function callGeminiModel(
           {
             parts: [
               {
-                text: 'Extract every food menu item and price from this image. Return only valid JSON: {"items":[{"name":"string","price":number}]}. Prices must be INR numbers without currency symbols. Skip headers, footers, addresses, and non-food lines. If price is missing for an item, use 0.',
+                text: MENU_EXTRACT_PROMPT,
               },
               {
                 inline_data: {
@@ -123,7 +126,7 @@ async function callGeminiModel(
             {
               parts: [
                 {
-                  text: 'Extract every food menu item and price from this image. Return only valid JSON: {"items":[{"name":"string","price":number}]}. Prices must be INR numbers without currency symbols.',
+                  text: MENU_EXTRACT_PROMPT,
                 },
                 {
                   inline_data: {
@@ -175,7 +178,7 @@ export async function extractMenuItemsFromImage(
   imageBase64: string,
   mimeType: string,
   fileName?: string,
-): Promise<{ name: string; price: number }[]> {
+): Promise<MenuItem[]> {
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
     throw new Error('GEMINI_NOT_CONFIGURED');
