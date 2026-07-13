@@ -1,6 +1,9 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireSuperadmin } from '@/lib/platform/admin';
-import { getOrganizerCommissionSummary } from '@/lib/queries/commission';
+import {
+  getOrganizerCommissionSummary,
+  type CommissionLineItem,
+} from '@/lib/queries/commission';
 
 export type OrganizerBillingStatus = 'due' | 'settled' | 'none';
 
@@ -33,15 +36,7 @@ export interface AdminOrganizerDetail extends AdminOrganizerRow {
     razorpay_payment_id: string | null;
     created_at: string;
   }[];
-  outstandingLines: {
-    id: string;
-    source: 'vendor' | 'rsvp';
-    eventTitle: string;
-    label: string;
-    gross: number;
-    platformFee: number;
-    paidAt: string | null;
-  }[];
+  outstandingLines: CommissionLineItem[];
   feePercent: number;
 }
 
