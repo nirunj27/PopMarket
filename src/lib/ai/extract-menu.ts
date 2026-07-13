@@ -13,6 +13,18 @@ function isQuotaError(error: unknown): boolean {
   );
 }
 
+function isRecoverableExtractionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return (
+    msg.includes('failed to validate json') ||
+    msg.includes('failed_generation') ||
+    msg.includes('could not parse menu json') ||
+    msg.includes('empty_response') ||
+    msg.includes('no menu items')
+  );
+}
+
 export function isMenuExtractionConfigured(): boolean {
   return isGeminiConfigured() || isGroqConfigured();
 }
@@ -30,7 +42,7 @@ export async function extractMenuFromImage(
     try {
       return await extractMenuItemsFromImage(imageBase64, mimeType, fileName);
     } catch (error) {
-      if (isQuotaError(error) && isGroqConfigured()) {
+      if (isGroqConfigured() && (isQuotaError(error) || isRecoverableExtractionError(error))) {
         return extractMenuItemsWithGroq(imageBase64, mimeType);
       }
       throw error;

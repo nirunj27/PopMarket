@@ -1,229 +1,319 @@
 # PopMarket OS — Food Truck Market Organizer
 
-A full-stack operations platform for food truck markets and pop-up festivals: vendor applications, stall maps, visitor RSVPs, Razorpay payments, AI menu extraction, and organizer dashboards.
+A full-stack operations platform for food truck markets and pop-up festivals. It connects platform admins, market organizers, vendors, and visitors through event management, applications, stall allocation, menus, RSVPs, payments, passes, and commission settlement.
 
 **Live demo:** [https://popmarket-os.vercel.app](https://popmarket-os.vercel.app)
 
-Built with **Next.js 16**, **TypeScript**, **Tailwind CSS v4**, **Supabase**, **Razorpay**, **React Hook Form**, and **Zod**.
+Built with **Next.js 16**, **React 19**, **TypeScript**, **Tailwind CSS v4**, **Supabase**, **Razorpay**, **React Hook Form**, and **Zod**.
 
-## Features
+## How the platform works
 
-### Superadmin (platform)
-- Separate login at `/admin/login`
-- Commission %, cities, Razorpay keys, organizer roles
-- Cross-organizer event and revenue overview
+### 1. Platform admin
 
-### Organizer (your clients)
-- Dashboard with event stats and upcoming markets
-- Create / publish / manage food truck events
-- Vendor application review (approve / waitlist / reject)
-- Interactive stall map with bay assignment
-- Payment tracking (Razorpay stall fees & RSVP tickets)
-- Per-event **payout & tax CSV** (gross, platform fee, organizer net, Razorpay IDs)
-- Vendor terms & conditions per event
-- AI menu extraction from uploaded menus (names, prices, and dish photos)
+- Signs in separately at `/admin/login`
+- Views organizers, events, published-market revenue, and platform commission
+- Configures the platform fee percentage and platform availability
+- Can disable new event creation and publishing with the platform switch
+- Uses a dedicated superadmin account; organizer accounts cannot access `/admin`
 
-### Vendors & RSVP guests (organizer's customers)
-- Public event page with featured trucks and floor plan
-- Vendor application form (cuisine, truck specs, power/water needs)
-- Visitor RSVP with capacity limits and waitlist
-- Token-based vendor status and RSVP confirmation pages
-- QR-ready confirmation passes
+### 2. Organizer
 
-### Platform engineering
-- Supabase Auth + Row Level Security (RLS)
-- Security headers (CSP, HSTS, X-Frame-Options)
-- Form validation with Zod + React Hook Form
-- Responsive food-market design system
-- ESLint + Prettier
+- Signs up for either the **Free RSVP plan** or **Paid RSVP plan**
+- Accepts the current organizer terms during signup
+- Creates an event as a draft and configures its venue, capacity, fees, cover image, and stall grid
+- Previews draft public and vendor-application pages before publishing
+- Publishes the market, reviews vendor applications, assigns stalls, tracks payments, and exports payout data
+- Settles outstanding platform commission from `/dashboard/billing`
+
+### 3. Vendor
+
+1. Opens `/apply/[event-slug]` without creating an account
+2. Submits business, cuisine, truck/stall, utility, menu, and preferred-stall details
+3. Can upload a menu image for AI extraction or add menu items and dish photos manually
+4. Receives a private status link at `/vendor/[token]`
+5. Is approved, waitlisted, or rejected by the organizer
+6. After approval, pays the stall fee and any premium-bay fee through Razorpay
+7. Receives a QR-ready vendor pass after payment is paid/waived and a stall is assigned
+
+### 4. RSVP guest
+
+1. Opens the public market at `/e/[event-slug]`
+2. Browses the vendor lineup, dish images, menu prices, floor plan, date, venue, and availability
+3. Submits an RSVP with party size
+4. Is confirmed when capacity is available or waitlisted when the market is full
+5. Pays through Razorpay only when that event has a guest entry fee
+6. Receives a private confirmation/pass page at `/rsvp/[token]`
+
+Duplicate vendor email/business applications and duplicate RSVP emails are blocked per event.
+
+## Plans and event pricing
+
+The organizer's plan and an event's guest fee are separate settings.
+
+| Capability | Free RSVP plan | Paid RSVP plan |
+| ---------- | -------------- | -------------- |
+| Published events | 1 at a time | Unlimited |
+| Maximum stall grid | 15×15 | 30×30 |
+| Free guest RSVPs | Yes | Yes |
+| Paid guest entry | No | Optional |
+| Vendor stall payments | Yes | Yes |
+
+A **Paid RSVP plan** organizer can still publish a free-entry event by setting the guest RSVP fee to ₹0. Vendor stall fees can remain paid on the same event.
+
+## Main features
+
+### Organizer dashboard
+
+- Event overview, share links, guest-entry status, and plan-aware limits
+- Draft creation and publishing
+- Cover-image upload and venue/address picker
+- Vendor application review: approve, waitlist, reject with reason
+- Searchable, sortable, filterable, paginated data tables
+- Interactive stall designer and assignment map
+- Standard and premium bays with optional premium fees
+- Paid bays protected from accidental reassignment
+- Manual vendor payment states: pending, paid, waived, or overdue
+- Vendor terms per event
+- Stall and RSVP payment history
+- Payout/tax CSV with gross, platform fee, organizer net, and Razorpay IDs
+- Organizer workflow guide at `/dashboard/guide`
+
+### Public event experience
+
+- Public page at `/e/[slug]`
+- Cover hero, event stats, RSVP form, menu cards, dish images, cuisine filters, and floor plan
+- First-visit welcome celebration and RSVP availability messaging
+- “Coming soon” page until at least one approved vendor has public menu content
+- Draft preview for the logged-in organizer; submissions remain disabled until publishing
+- Focused public flows without dashboard navigation or unnecessary footer content
+
+### Menu AI and images
+
+- Menu extraction is available to vendors in the application form
+- Upload limit: 5 MB per menu image
+- Gemini is attempted first; Groq is used as a fallback for supported extraction failures
+- Extracted names and prices remain editable before submission
+- When the model returns image regions, the browser crops dish images from the uploaded menu
+- Vendors can upload or replace each dish image manually
+- Broken external images fall back to reliable generated food artwork
+- Dish thumbnails open in an image preview dialog
+
+AI extraction requires `GEMINI_API_KEY`, `GROQ_API_KEY`, or both.
+
+### Billing and platform commission
+
+- Default platform fee: **10%**, editable at `/admin/settings`
+- Commission applies to paid vendor stalls and paid RSVP entry
+- Each payment stores gross amount, platform fee, and organizer net
+- Organizers collect customer payments and settle outstanding commission from **Dashboard → Billing**
+- Commission settlements are tracked separately from customer payments
+- Free RSVPs and waived vendor payments do not create a paid guest charge
+- Public organizer terms are available at `/terms`
+
+## Authentication and routes
+
+| User | Entry point | Destination |
+| ---- | ----------- | ----------- |
+| Platform admin | `/admin/login` | `/admin` |
+| Organizer | `/login` or `/signup` | `/dashboard` |
+| Event visitor | `/e/[slug]` | Public event and RSVP |
+| Vendor | `/apply/[slug]` | Application form |
+| Vendor with token | `/vendor/[token]` | Status, payment, and pass |
+| Guest with token | `/rsvp/[token]` | RSVP status, payment, and pass |
+
+Platform admins cannot use the organizer dashboard, and organizers cannot access the platform console. Logged-in organizers may still open `/admin/login` to switch to a platform account.
 
 ## Tech stack
 
-| Layer | Tech |
-| ----- | ---- |
-| Frontend | Next.js App Router, React 19, Tailwind CSS v4 |
-| Backend | Next.js Server Actions + Route Handlers |
-| Database / Auth | Supabase (Postgres, Auth, RLS, Storage) |
+| Layer | Technology |
+| ----- | ---------- |
+| Frontend | Next.js App Router, React 19, TypeScript, Tailwind CSS v4 |
+| Forms | React Hook Form, Zod |
+| Backend | Next.js Server Actions and Route Handlers |
+| Database/Auth | Supabase Postgres, Auth, RLS, Storage |
 | Payments | Razorpay |
-| AI | Google Gemini / Groq (menu extraction) |
-| Deploy | Vercel + Supabase Cloud |
+| AI | Google Gemini with Groq fallback |
+| Deployment | Vercel and Supabase Cloud |
 
 ## Project structure
 
-```
+```text
 src/
 ├── app/
-│   ├── (auth)/              # Organizer login & signup
-│   ├── admin/               # Superadmin login + console
+│   ├── (auth)/              # Organizer login and signup
 │   ├── (dashboard)/         # Organizer dashboard
-│   ├── (public)/            # Event, apply, vendor, RSVP pages
-│   ├── api/                 # API routes (e.g. menu extraction)
-│   ├── layout.tsx
-│   └── page.tsx             # Marketing landing page
+│   ├── (public)/            # Event, apply, vendor, RSVP, and terms pages
+│   ├── admin/               # Platform login and console
+│   └── api/                 # Menu extraction and payment APIs
 ├── components/
-│   ├── ui/                  # Design system primitives
-│   ├── layout/              # Shells, headers, sidebar
-│   ├── forms/               # Validated forms
-│   ├── features/            # Events, stalls, applications, payments
-│   ├── marketing/           # Landing sections
-│   └── public/              # Public portal UI
+│   ├── features/            # Events, vendors, menus, stalls, payments
+│   ├── forms/               # Validated interactive forms
+│   ├── layout/              # Public, organizer, and admin shells
+│   ├── marketing/           # Landing-page sections
+│   └── ui/                  # Shared design-system components
 ├── lib/
 │   ├── actions/             # Server actions
-│   ├── queries/             # Data fetching
-│   ├── validations/         # Zod schemas
-│   ├── supabase/            # Browser / server / admin clients
-│   ├── payments/            # Razorpay helpers
-│   ├── ai/                  # Gemini / Groq
-│   └── constants/           # App constants
-├── types/                   # Shared TypeScript types
-scripts/                     # Seed & reset scripts
-supabase/                    # SQL schema (RLS policies)
+│   ├── ai/                  # Gemini and Groq extraction
+│   ├── payments/            # Razorpay integration
+│   ├── queries/             # Supabase data access
+│   ├── supabase/            # Browser, server, and admin clients
+│   └── validations/         # Zod schemas
+└── types/                   # Shared TypeScript types
+
+scripts/                     # Demo, showcase, load-test, and reset scripts
+supabase/                    # Base schema, migrations, and storage setup
 ```
 
-## Getting started
+## Local setup
 
-### 1. Install dependencies
+### 1. Install
 
 ```bash
-cd popmarket-os
 npm install
 ```
 
-### 2. Environment variables
+### 2. Configure environment variables
+
+Copy `.env.example` to `.env.local` and fill in the required values:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Fill in `.env.local`:
+On Windows PowerShell:
 
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
+```powershell
+Copy-Item .env.example .env.local
+```
+
+| Variable | Required | Purpose |
+| -------- | -------- | ------- |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role (server only — never expose to client) |
-| `NEXT_PUBLIC_APP_URL` | Yes | `http://localhost:3000` locally; production URL on Vercel |
-| `RAZORPAY_KEY_ID` | Optional | Razorpay key ID |
-| `RAZORPAY_KEY_SECRET` | Optional | Razorpay secret (server only) |
-| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Optional | Razorpay key for Checkout |
-| `RESEND_API_KEY` | Optional | Resend API key for emails |
-| `EMAIL_FROM` | Optional | Sender, e.g. `PopMarket <onboarding@resend.dev>` |
-| `GEMINI_API_KEY` | Optional | Google Gemini for menu extraction |
-| `GROQ_API_KEY` | Optional | Groq fallback for menu extraction |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Optional | Venue / maps picker |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Public Supabase client key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Signup, admin operations, previews, and seeds; server only |
+| `NEXT_PUBLIC_APP_URL` | Yes | `http://localhost:3000` locally or the deployed URL |
+| `SUPERADMIN_EMAILS` | Recommended | Comma-separated platform-admin emails |
+| `RAZORPAY_KEY_ID` | For payments | Server-side Razorpay key |
+| `RAZORPAY_KEY_SECRET` | For payments | Server-side Razorpay secret |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | For payments | Browser Checkout key |
+| `GEMINI_API_KEY` | Optional | Primary menu extraction provider |
+| `GEMINI_MODEL` | Optional | Gemini model override |
+| `GROQ_API_KEY` | Optional | Menu extraction fallback |
+| `GROQ_MODEL` | Optional | Groq model override |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Optional | Venue/address autocomplete |
+
+Never expose `SUPABASE_SERVICE_ROLE_KEY` or `RAZORPAY_KEY_SECRET` to browser code.
 
 ### 3. Set up Supabase
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Run `supabase/schema.sql` in the SQL Editor
-3. **Authentication → URL Configuration**
-   - Local: Site URL `http://localhost:3000`, Redirect URLs `http://localhost:3000/**`
-   - Production: Site URL `https://popmarket-os.vercel.app`, Redirect URLs `https://popmarket-os.vercel.app/**`
-4. For local testing without SMTP: **Providers → Email → Confirm email → Off**
+1. Create a project at [supabase.com](https://supabase.com).
+2. Run `supabase/schema.sql` in the SQL Editor.
+3. Run the SQL files in `supabase/migrations/`.
+4. Run `supabase/storage.sql` to create the event-cover storage bucket and policies.
+5. In **Authentication → URL Configuration**, set:
+   - Local site URL: `http://localhost:3000`
+   - Local redirect URL: `http://localhost:3000/**`
+   - Production site URL and redirect URL to the deployed domain
+6. Set `SUPERADMIN_EMAILS` to platform-team addresses only.
 
-### 4. Seed demo data (optional)
+Existing Supabase projects should apply any migration files they have not run yet.
 
-Credentials are printed in the terminal only — login pages stay clean.
+### 4. Seed demo data
 
 ```bash
-# Accounts only (organizer + superadmin)
+# Demo accounts only
 npm run seed:dev
 
-# Accounts + sample markets / vendors / RSVPs
+# Accounts + workflow matrix + rich public showcase
 npm run seed:all
 
-# Full wipe + seed + large load-test dataset
+# Everything above plus load-test data
+npm run seed:full
+
+# Clear seeded data, then rebuild core demo fixtures
+npm run reset:seed
+
+# Clear data, then add bulk load-test fixtures
 npm run reset:seed:large
 ```
 
-| Role | Portal | Email | Password |
-| ---- | ------ | ----- | -------- |
-| Organizer | `/login` | `organizer@popmarket.dev` | `Demo@12345` |
-| Superadmin | `/admin/login` | `platform@popmarket.dev` | `Admin@12345` |
+Demo credentials:
 
-Keep `SUPERADMIN_EMAILS=platform@popmarket.dev` (not the organizer email).
+| Account | Plan | Email | Password | Login |
+| ------- | ---- | ----- | -------- | ----- |
+| Organizer | Paid RSVP | `organizer@popmarket.dev` | `Demo@12345` | `/login` |
+| Organizer | Free RSVP | `client2@popmarket.dev` | `Demo@12345` | `/login` |
+| Platform admin | Platform | `platform@popmarket.dev` | `Admin@12345` | `/admin/login` |
 
-### 5. Run locally
+Keep `SUPERADMIN_EMAILS=platform@popmarket.dev`; do not add organizer emails.
+
+Key public demos after `npm run seed:all`:
+
+- Paid guest RSVP: `/e/corporate-lunch-market`
+- Free guest RSVP with 20 vendors, menu images, and 25 stalls: `/e/community-picnic-free`
+- Vendor application: `/apply/corporate-lunch-market`
+- Additional private vendor and RSVP token URLs are printed by the seed scripts
+
+### 5. Run the app
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000).
 
 ## Scripts
 
 | Command | Description |
 | ------- | ----------- |
-| `npm run dev` | Start development server |
-| `npm run build` | Production build |
-| `npm run start` | Start production server |
+| `npm run dev` | Start the development server |
+| `npm run build` | Create a production build |
+| `npm run start` | Start the production server |
 | `npm run lint` | Run ESLint |
-| `npm run lint:fix` | Auto-fix ESLint issues |
-| `npm run format` | Format with Prettier |
-| `npm run typecheck` | TypeScript check |
-| `npm run seed:dev` | Create demo organizer + superadmin |
-| `npm run seed:demo` | Seed sample market data |
-| `npm run seed:all` | Seed users + demo data |
-| `npm run seed:large` | Bulk vendors/RSVPs/payments for load testing |
-| `npm run reset:dev` | Clear seeded app data |
-| `npm run reset:seed` | Reset + seed users + demo data |
-| `npm run reset:seed:large` | Reset + demo + large dataset |
+| `npm run lint:fix` | Apply supported ESLint fixes |
+| `npm run format` | Format files with Prettier |
+| `npm run format:check` | Check formatting |
+| `npm run typecheck` | Run TypeScript without emitting files |
+| `npm run seed:dev` | Create paid organizer, free organizer, and platform-admin accounts |
+| `npm run seed:demo` | Add core events, vendors, RSVPs, stalls, and payments |
+| `npm run seed:matrix` | Add fixtures covering billing, admin, free RSVP, and menu-image flows |
+| `npm run seed:showcase` | Add the rich public picnic showcase |
+| `npm run seed:large` | Add bulk vendors, RSVPs, and payments for table/load testing |
+| `npm run seed:all` | Run dev, demo, matrix, and showcase seeds |
+| `npm run seed:full` | Run all seeds, including the large dataset |
+| `npm run reset:dev` | Remove seeded app data |
+| `npm run reset:seed` | Reset, then run dev, demo, and matrix seeds |
+| `npm run reset:seed:large` | Reset, then run dev, demo, matrix, and large seeds |
+| `npm run reset:seed:full` | Alias of `reset:seed:large` |
 
-## Platform revenue (superadmin)
+## Deployment
 
-### Who logs in where
-
-| Role | Portal | URL |
-| ---- | ------ | --- |
-| **Superadmin** (platform team) | Platform console only | `/admin/login` → `/admin` |
-| **Organizer** (your clients) | Market dashboard + Billing | `/login` → `/dashboard` |
-| **Vendors & RSVP guests** | Token links (no account) | `/apply/[slug]`, `/vendor/[token]`, `/rsvp/[token]` |
-
-These roles do **not** share dashboards. Superadmins cannot open `/dashboard`; organizers cannot open `/admin`.
-
-Organizers accept **Terms** at signup (live platform % on stall + RSVP fees) and settle commission at **Dashboard → Billing**.
-
-- Default platform fee: **10%** (editable in `/admin/settings`)
-- Public terms: `/terms`
-- Demo: keep `SUPERADMIN_EMAILS` on a **platform** email, not your organizer clients
-
-Run `supabase/migrations/add-platform-admin.sql` and `add-commission-settlements.sql` in Supabase.
-
-## Menu images
-
-Vendors can attach a **dish photo** per menu item. **AI Extract** reads a menu card and pulls names, prices, and dish photos when the card includes food images (cropped from the upload). You can still replace any Pic manually. Images are stored with the menu item JSON.
-
-The app is deployed at **[https://popmarket-os.vercel.app](https://popmarket-os.vercel.app)**.
-
-### Deploy / update
-
-1. Push to GitHub or run:
+1. Push the repository to GitHub and import it into Vercel, or run:
 
 ```bash
 npx vercel --prod
 ```
 
-2. Set the same env vars from `.env.example` in **Vercel → Project → Settings → Environment Variables**
-3. Set `NEXT_PUBLIC_APP_URL=https://popmarket-os.vercel.app`
-4. Update Supabase Auth Site URL + Redirect URLs to the production domain
-5. Redeploy after adding env vars so the build picks them up
+2. Add the `.env.example` variables under **Vercel → Project → Settings → Environment Variables**.
+3. Set `NEXT_PUBLIC_APP_URL` to the production domain.
+4. Add the production domain to Supabase Auth site and redirect URLs.
+5. Confirm the Supabase schema, migrations, and storage policies are applied.
+6. Redeploy after changing environment variables.
 
-### Architecture
-
+```text
+Browser → Vercel / Next.js → Supabase Auth, Postgres, RLS, Storage
+                          ├→ Razorpay
+                          └→ Gemini → Groq fallback
 ```
-Browser → Vercel (Next.js) → Supabase (Auth, Postgres, RLS)
-                          → Razorpay /Gemini (optional)
-```
 
-## Color palette
+## Design system
 
-| Token | Hex | Usage |
-| ----- | --- | ----- |
-| Primary | `#E85D04` | Burnt orange — CTAs, energy |
-| Secondary | `#2D6A4F` | Forest green — trust, freshness |
-| Accent | `#F4A261` | Golden mustard — highlights |
-| Background | `#FFFBF7` | Warm cream — page background |
+| Token | Value | Use |
+| ----- | ----- | --- |
+| Primary | `#E85D04` | Burnt-orange calls to action |
+| Secondary | `#2D6A4F` | Forest-green trust and success states |
+| Accent | `#F4A261` | Warm highlights |
+| Background | `#FFFBF7` | Cream page background |
 
 ## License
 

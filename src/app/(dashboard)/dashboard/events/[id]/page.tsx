@@ -22,6 +22,7 @@ import {
   Users,
   Grid3x3,
   IndianRupee,
+  Ticket,
   Zap,
   Star,
   CheckCircle2,
@@ -179,6 +180,20 @@ export default async function EventDetailPage({ params }: EventDetailPageProps) 
             <Detail icon={Grid3x3} label="Stall layout" value={`${event.stall_rows}×${event.stall_cols} grid`} sub={`${assignableStalls.length} bays for vendors`} />
             <Detail icon={Users} label="Visitor capacity" value={`${event.visitor_capacity.toLocaleString('en-IN')} guests`} />
             <Detail icon={IndianRupee} label="Base stall fee" value={formatCurrency(Number(event.stall_fee))} />
+            <Detail
+              icon={Ticket}
+              label="Guest entry"
+              value={
+                Number(event.rsvp_entry_fee) > 0
+                  ? `${formatCurrency(Number(event.rsvp_entry_fee))} / guest`
+                  : 'Free'
+              }
+              sub={
+                Number(event.rsvp_entry_fee) > 0
+                  ? 'Collected when visitors RSVP'
+                  : 'Visitors can RSVP without payment'
+              }
+            />
             {premiumStalls.length > 0 && (
               <Detail
                 icon={Star}

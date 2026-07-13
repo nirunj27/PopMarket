@@ -19,6 +19,9 @@ import {
   PortalStatStrip,
 } from '@/components/layout/public-portal-shell';
 import Link from 'next/link';
+import { EventCoverHero } from '@/components/features/events/event-cover-hero';
+import { PublicEventCelebration } from '@/components/features/events/public-event-celebration';
+import { PublicEventRsvpHype } from '@/components/features/events/public-event-rsvp-hype';
 import { buttonVariants } from '@/components/ui/button-variants';
 
 interface PublicEventPageProps {
@@ -68,16 +71,18 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
 
   return (
     <main id="main-content" className="flex-1">
-      {isPreview && <DraftPreviewBanner dashboardHref={`/dashboard/events/${event.id}`} />}
-
-      {event.cover_image_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={event.cover_image_url}
-          alt=""
-          className="h-24 w-full border-b border-border object-cover sm:h-28"
+      {!isPreview && (
+        <PublicEventCelebration
+          eventSlug={slug}
+          eventTitle={event.title}
+          spotsRemaining={spotsRemaining}
+          vendorCount={vendors.length}
         />
       )}
+
+      {isPreview && <DraftPreviewBanner dashboardHref={`/dashboard/events/${event.id}`} />}
+
+      {event.cover_image_url && <EventCoverHero src={event.cover_image_url} />}
 
       <PublicPortalShell
         eyebrow={isPreview ? 'Draft preview' : 'Food truck market'}
@@ -85,6 +90,14 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
         subtitle={event.description ?? undefined}
         aside={
           <div className="space-y-2">
+            {!isPreview && (
+              <PublicEventRsvpHype
+                spotsRemaining={spotsRemaining}
+                vendorCount={vendors.length}
+                entryFeePerGuest={Number(event.rsvp_entry_fee ?? 0)}
+              />
+            )}
+
             <PortalPanel title="Reserve your spot">
               {isPreview ? (
                 <p className="text-sm text-muted-foreground">
@@ -132,9 +145,7 @@ export default async function PublicEventPage({ params }: PublicEventPageProps) 
           <PortalStat label="Spots left" value={spotsRemaining} highlight />
         </PortalStatStrip>
 
-        <div className="max-h-[min(480px,55vh)] overflow-y-auto rounded-lg">
-          <VendorMenuSection vendors={vendors} compact />
-        </div>
+        <VendorMenuSection vendors={vendors} attractive />
 
         <PortalPanel title="Market floor plan" noPadding>
           <div className="p-2">

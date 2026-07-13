@@ -37,6 +37,17 @@ const DEMO_USERS = [
     portal: 'http://localhost:3000/login',
   },
   {
+    email: 'client2@popmarket.dev',
+    password: 'Demo@12345',
+    fullName: 'Priya Events Co',
+    companyName: 'Priya Street Markets',
+    phone: '9876501111',
+    address: '22 Market Road, Pune 411001',
+    role: 'organizer',
+    plan: 'free',
+    portal: 'http://localhost:3000/login',
+  },
+  {
     email: 'platform@popmarket.dev',
     password: 'Admin@12345',
     fullName: 'Platform Admin',

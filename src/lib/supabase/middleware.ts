@@ -73,6 +73,11 @@ export async function updateSession(request: NextRequest) {
 
   // Logged-in users on auth pages → send to their home
   if (user && AUTH_ROUTES.includes(pathname)) {
+    // Organizers opening /admin/login from the footer should see the admin login page
+    if (pathname === '/admin/login' && role !== 'superadmin') {
+      return supabaseResponse;
+    }
+
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = role === 'superadmin' ? '/admin' : '/dashboard';
     return NextResponse.redirect(redirectUrl);

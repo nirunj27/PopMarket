@@ -14,10 +14,14 @@
     "seed:dev": "node scripts/seed-dev-user.mjs",
     "seed:demo": "node scripts/seed-demo-data.mjs",
     "seed:large": "node scripts/seed-large-data.mjs",
-    "seed:all": "node scripts/seed-dev-user.mjs && node scripts/seed-demo-data.mjs",
+    "seed:matrix": "node scripts/seed-test-matrix.mjs",
+    "seed:showcase": "node scripts/seed-public-showcase.mjs",
+    "seed:full": "node scripts/seed-dev-user.mjs && node scripts/seed-demo-data.mjs && node scripts/seed-test-matrix.mjs && node scripts/seed-public-showcase.mjs && node scripts/seed-large-data.mjs",
+    "seed:all": "node scripts/seed-dev-user.mjs && node scripts/seed-demo-data.mjs && node scripts/seed-test-matrix.mjs && node scripts/seed-public-showcase.mjs",
     "reset:dev": "node scripts/reset-dev-data.mjs",
-    "reset:seed": "node scripts/reset-dev-data.mjs && node scripts/seed-dev-user.mjs && node scripts/seed-demo-data.mjs",
-    "reset:seed:large": "node scripts/reset-dev-data.mjs && node scripts/seed-dev-user.mjs && node scripts/seed-demo-data.mjs && node scripts/seed-large-data.mjs"
+    "reset:seed": "node scripts/reset-dev-data.mjs && node scripts/seed-dev-user.mjs && node scripts/seed-demo-data.mjs && node scripts/seed-test-matrix.mjs",
+    "reset:seed:large": "node scripts/reset-dev-data.mjs && node scripts/seed-dev-user.mjs && node scripts/seed-demo-data.mjs && node scripts/seed-test-matrix.mjs && node scripts/seed-large-data.mjs",
+    "reset:seed:full": "npm run reset:seed:large"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

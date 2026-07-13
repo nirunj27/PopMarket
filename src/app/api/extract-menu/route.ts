@@ -32,6 +32,14 @@ function userFacingError(error: unknown): string {
     return 'No menu items detected. Try a clearer photo or add items manually.';
   }
 
+  if (message.includes('Failed to validate JSON') || message.includes('failed_generation')) {
+    return 'Could not read this menu image. Try a clearer photo or use Add Manually.';
+  }
+
+  if (message.includes('Could not parse menu JSON')) {
+    return 'Menu scan returned invalid data. Try again or add items manually.';
+  }
+
   return message;
 }
 

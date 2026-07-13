@@ -5,6 +5,7 @@ import type { MenuItem } from '@/lib/menu';
 import { compressMenuImage } from '@/lib/image/compress-menu-image';
 import { cropMenuRegionToDataUrl } from '@/lib/image/crop-menu-region';
 import { Input } from '@/components/ui/input';
+import { ImagePreviewDialog } from '@/components/ui/image-preview-dialog';
 import { cn } from '@/lib/utils';
 import { IndianRupee, Loader2, Plus, Trash2, Upload, Wand2, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,7 +21,9 @@ interface MenuItemsEditorProps {
 export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps) {
   const [tab, setTab] = useState<MenuTab>('ai');
   const [extracting, setExtracting] = useState(false);
+  const [preview, setPreview] = useState<{ src: string; title: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const uploadRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   const updateItem = (index: number, patch: Partial<MenuItem>) => {
     const base = items.length > 0 ? items : [{ name: '', price: 0 }];
@@ -147,31 +150,76 @@ export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps
                 key={index}
                 className="grid grid-cols-[40px_1fr_88px_32px] items-center gap-2 border-b border-border/40 px-2 py-1.5 last:border-0 even:bg-muted/10"
               >
-                <label className="relative flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted/20 hover:border-primary/40">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        if (typeof reader.result === 'string') {
-                          updateItem(index, { imageUrl: reader.result });
-                        }
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                    aria-label={`Upload photo for item ${index + 1}`}
-                  />
+                <div className="relative h-9 w-9">
                   {item.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPreview({
+                          src: item.imageUrl!,
+                          title: item.name.trim() || `Item ${index + 1}`,
+                        })
+                      }
+                      className="flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-border bg-muted/20 transition-colors hover:ring-2 hover:ring-primary/40"
+                      aria-label={`Preview photo for ${item.name || `item ${index + 1}`}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
+                    </button>
                   ) : (
-                    <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                    <label className="flex h-9 w-9 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted/20 hover:border-primary/40">
+                      <input
+                        ref={(el) => {
+                          uploadRefs.current[index] = el;
+                        }}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') {
+                              updateItem(index, { imageUrl: reader.result });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        aria-label={`Upload photo for item ${index + 1}`}
+                      />
+                      <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                    </label>
                   )}
-                </label>
+                  {item.imageUrl && (
+                    <label
+                      title="Replace photo"
+                      className="absolute -bottom-1 -right-1 flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border border-border bg-background shadow-sm hover:bg-muted"
+                    >
+                      <input
+                        ref={(el) => {
+                          uploadRefs.current[index] = el;
+                        }}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') {
+                              updateItem(index, { imageUrl: reader.result });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        aria-label={`Replace photo for item ${index + 1}`}
+                      />
+                      <Upload className="h-2.5 w-2.5 text-muted-foreground" />
+                    </label>
+                  )}
+                </div>
                 <Input
                   className="h-8 rounded-md border-border/60 bg-background text-xs"
                   placeholder="Dish name"
@@ -218,6 +266,13 @@ export function MenuItemsEditor({ items, onChange, error }: MenuItemsEditorProps
       )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
+
+      <ImagePreviewDialog
+        open={!!preview}
+        onOpenChange={(open) => !open && setPreview(null)}
+        src={preview?.src ?? null}
+        title={preview?.title}
+      />
     </div>
   );
 }

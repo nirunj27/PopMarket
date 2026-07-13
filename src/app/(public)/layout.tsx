@@ -1,5 +1,4 @@
 import { SiteHeader } from '@/components/layout/site-header';
-import { SiteFooter } from '@/components/layout/site-footer';
 import { PublicThemeLock } from '@/components/layout/public-theme-lock';
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
@@ -8,7 +7,6 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <PublicThemeLock />
       <SiteHeader variant="minimal" />
       <div className="flex flex-1 flex-col">{children}</div>
-      <SiteFooter />
     </div>
   );
 }

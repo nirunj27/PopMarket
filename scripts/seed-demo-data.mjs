@@ -27,6 +27,8 @@ const TOKENS = {
   vendorPaidNj: 'demovendorpaidnjtruck01',
   vendorPendingTaco: 'demovendorpendingtaco1',
   vendorApprovedUnpaid: 'demovendorapprovedunpd1',
+  vendorWaitlisted: 'demovendorwaitlisted01',
+  vendorRejected: 'demovendorrejected0001',
 };
 
 const VENDORS = [
@@ -120,6 +122,7 @@ const VENDORS = [
     ],
   },
   {
+    token: TOKENS.vendorWaitlisted,
     business_name: 'Burger Barn',
     owner_name: 'Tom Wilson',
     email: 'tom@demo.popmarket.dev',
@@ -131,6 +134,7 @@ const VENDORS = [
     menu_items: [{ name: 'Classic Burger', price: 150 }],
   },
   {
+    token: TOKENS.vendorRejected,
     business_name: 'Curry Cart',
     owner_name: 'Ravi Nair',
     email: 'ravi@demo.popmarket.dev',

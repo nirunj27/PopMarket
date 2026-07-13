@@ -1,12 +1,12 @@
 import { parseMenuItems, type MenuItem } from '@/lib/menu';
 
 const MENU_EXTRACT_PROMPT =
-  'Extract every food menu item and price from this image. When a dish photo appears next to an item, also return its bounding box as fractions of the image (0–1): x,y = top-left, w,h = size. Return only JSON: {"items":[{"name":"string","price":number,"box":{"x":0,"y":0,"w":0,"h":0}}]}. Omit box if there is no dish photo. Prices in INR as plain numbers. Skip headers and non-food lines.';
+  'You are a menu OCR assistant. Extract every food menu item and price from this image. Return ONLY a JSON object with this shape: {"items":[{"name":"Dish name","price":120}]}. price must be a number in INR without currency symbols. If a dish photo appears beside a row, you may add "box":{"x":0.1,"y":0.2,"w":0.15,"h":0.12} as fractions 0-1 of the image (top-left x,y and width,height). Omit box when there is no dish photo. Skip headers, addresses, and non-food lines. No markdown, no explanation.';
 
 const MODEL_FALLBACKS = [
   process.env.GROQ_MODEL,
-  'qwen/qwen3.6-27b',
   'meta-llama/llama-4-scout-17b-16e-instruct',
+  'qwen/qwen3.6-27b',
 ].filter((model, index, list): model is string => Boolean(model) && list.indexOf(model) === index);
 
 export function isGroqConfigured(): boolean {
@@ -39,6 +39,9 @@ function parseGroqError(raw: string): string {
     if (message.includes('decommissioned')) {
       return 'Groq vision model was updated. Restart the dev server and try again.';
     }
+    if (message.includes('Failed to validate JSON') || message.includes('failed_generation')) {
+      return 'Menu scan could not parse this image. Try a clearer photo or add items manually.';
+    }
     if (message) return message.slice(0, 180);
   } catch {
     if (raw.includes('decommissioned')) {
@@ -52,40 +55,53 @@ async function callGroqModel(
   model: string,
   apiKey: string,
   dataUrl: string,
+  useStrictJson = false,
 ): Promise<MenuItem[]> {
+  const body: Record<string, unknown> = {
+    model,
+    temperature: 0.1,
+    max_tokens: 4096,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: MENU_EXTRACT_PROMPT,
+          },
+          {
+            type: 'image_url',
+            image_url: { url: dataUrl },
+          },
+        ],
+      },
+    ],
+  };
+
+  if (useStrictJson) {
+    body.response_format = { type: 'json_object' };
+  }
+
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model,
-      temperature: 0.1,
-      max_tokens: 4096,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: MENU_EXTRACT_PROMPT,
-            },
-            {
-              type: 'image_url',
-              image_url: { url: dataUrl },
-            },
-          ],
-        },
-      ],
-    }),
+    body: JSON.stringify(body),
   });
 
   const raw = await response.text();
 
   if (!response.ok) {
     const friendly = parseGroqError(raw);
+    const jsonValidationFailed =
+      friendly.includes('Failed to validate JSON') || friendly.includes('failed_generation');
+
+    if (jsonValidationFailed && useStrictJson) {
+      return callGroqModel(model, apiKey, dataUrl, false);
+    }
+
     if (response.status === 404 || friendly.toLowerCase().includes('decommissioned')) {
       throw new Error(`GROQ_MODEL_UNAVAILABLE:${model}:${friendly}`);
     }
@@ -104,7 +120,13 @@ async function callGroqModel(
     throw new Error('GROQ_EMPTY_RESPONSE');
   }
 
-  const parsed = JSON.parse(extractJsonText(text)) as { items?: unknown };
+  let parsed: { items?: unknown };
+  try {
+    parsed = JSON.parse(extractJsonText(text)) as { items?: unknown };
+  } catch {
+    throw new Error('GROQ_FAILED:Could not parse menu JSON from model response');
+  }
+
   const items = parseMenuItems(parsed.items);
 
   if (items.length === 0) {
@@ -128,7 +150,7 @@ export async function extractMenuItemsWithGroq(
 
   for (const model of MODEL_FALLBACKS) {
     try {
-      return await callGroqModel(model, apiKey, dataUrl);
+      return await callGroqModel(model, apiKey, dataUrl, false);
     } catch (error) {
       if (error instanceof Error) {
         lastError = error.message.replace(/^GROQ_[A-Z_]+:/, '').trim() || lastError;

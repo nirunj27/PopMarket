@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSupabaseConfigured } from '@/lib/env';
-import { extractMenuItemsFromDescription } from '@/lib/menu';
+import { extractMenuItemsFromDescription, parseMenuItems } from '@/lib/menu';
 import type { Event, EventWithStats, StallWithAssignment, VendorApplication, VendorApplicationWithDetails, EventPaymentRow, PaymentStatus } from '@/types';
 
 export async function getEventsForOrganizer(): Promise<EventWithStats[]> {
@@ -393,7 +393,7 @@ export async function getApprovedVendorsForEvent(eventId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from('vendor_applications')
-    .select('id, business_name, cuisine_type, menu_description, truck_name')
+    .select('id, business_name, cuisine_type, menu_description, menu_items, truck_name')
     .eq('event_id', eventId)
     .eq('status', 'approved');
   return data ?? [];
@@ -425,8 +425,11 @@ export async function getPublicReadyVendorsForEvent(eventId: string) {
   const vendors = await getApprovedVendorsForEvent(eventId);
   return vendors.filter((v) => {
     if (!v.cuisine_type?.trim() || !v.business_name?.trim()) return false;
-    const items = extractMenuItemsFromDescription(v.menu_description);
-    return Boolean(v.menu_description?.trim()) || items.length > 0;
+    const fromDescription = extractMenuItemsFromDescription(v.menu_description);
+    const fromItems = parseMenuItems(v.menu_items);
+    return (
+      Boolean(v.menu_description?.trim()) || fromDescription.length > 0 || fromItems.length > 0
+    );
   });
 }
 

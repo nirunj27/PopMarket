@@ -56,7 +56,8 @@ export function SidebarUserFooter({
           .toUpperCase();
 
         const plan = showPlan ? parseOrganizerPlan(meta.plan) : null;
-        const planLabel = plan === 'paid' ? 'Paid' : plan === 'free' ? 'Free' : null;
+        const planLabel =
+          plan === 'paid' ? 'Paid RSVP plan' : plan === 'free' ? 'Free RSVP plan' : null;
 
         setUser({ name, email, initials, planLabel });
       } catch {

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { AuthHeader } from '@/components/layout/auth-header';
 import { PageContainer } from '@/components/layout/page-container';
+import { SiteFooter } from '@/components/layout/site-footer';
 import { OrganizerTermsDisplay } from '@/components/features/legal/organizer-terms-display';
 import { getPublicPlatformFeePercent } from '@/lib/platform/admin';
 import { buttonVariants } from '@/components/ui/button-variants';
@@ -17,9 +17,8 @@ export default async function TermsPage() {
   const feePercent = await getPublicPlatformFeePercent();
 
   return (
-    <div className="min-h-screen bg-muted/20">
-      <AuthHeader />
-      <main id="main-content">
+    <>
+      <main id="main-content" className="flex-1 bg-muted/20">
         <PageContainer className="max-w-3xl space-y-6 py-10">
           <div className="space-y-2">
             <h1 className="font-display text-3xl font-bold">Organizer terms & conditions</h1>
@@ -41,6 +40,7 @@ export default async function TermsPage() {
           </div>
         </PageContainer>
       </main>
-    </div>
+      <SiteFooter />
+    </>
   );
 }

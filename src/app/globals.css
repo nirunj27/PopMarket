@@ -161,7 +161,7 @@ a:not([class]):hover {
   --popover-foreground: #1a1816;
   --primary: #d4510a;
   --primary-foreground: #ffffff;
-  --secondary: #2563eb;
+  --secondary: #2d6a4f;
   --secondary-foreground: #ffffff;
   --accent: #fef3e8;
   --accent-foreground: #9a3412;
@@ -186,7 +186,7 @@ a:not([class]):hover {
   --popover-foreground: #1a1816;
   --primary: #d4510a;
   --primary-foreground: #ffffff;
-  --secondary: #2563eb;
+  --secondary: #2d6a4f;
   --secondary-foreground: #ffffff;
   --accent: #fef3e8;
   --accent-foreground: #9a3412;
@@ -318,6 +318,26 @@ a:not([class]):hover {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(0deg);
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(0, 105vh, 0) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.confetti-piece {
+  animation-name: confetti-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
 }
 
 /* Button ripple micro-interaction */

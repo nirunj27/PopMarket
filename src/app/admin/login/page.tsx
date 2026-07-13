@@ -3,13 +3,29 @@ import Link from 'next/link';
 import { LoginForm } from '@/components/forms/login-form';
 import { AuthHeader } from '@/components/layout/auth-header';
 import { PageContainer } from '@/components/layout/page-container';
+import { AdminLoginSessionNotice } from '@/components/auth/admin-login-session-notice';
+import { resolveUserRole } from '@/lib/auth/roles';
+import { createClient } from '@/lib/supabase/server';
 import { Shield } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Admin login',
 };
 
-export default function AdminLoginPage() {
+export default async function AdminLoginPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let organizerEmail: string | null = null;
+  if (user?.email) {
+    const role = await resolveUserRole(user.id, user.email);
+    if (role === 'organizer') {
+      organizerEmail = user.email;
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
       <AuthHeader />
@@ -24,6 +40,8 @@ export default function AdminLoginPage() {
                 PopMarket platform
               </p>
             </div>
+
+            {organizerEmail && <AdminLoginSessionNotice email={organizerEmail} />}
 
             <LoginForm variant="superadmin" />
 
